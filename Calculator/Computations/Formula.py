@@ -1,7 +1,7 @@
-from Calculator.Datum import Datum
+from Calculator.Computations.Datum import Datum
 import sympy as sp
 from typing import Dict, Tuple, List
-from Calculator.CONSTANTS import ZERO_TOLERANCE_EXPONENT
+from Calculator.Storage.CONSTANTS import ZERO_TOLERANCE_EXPONENT
 
 
 class Formula:

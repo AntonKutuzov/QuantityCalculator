@@ -1,9 +1,9 @@
 from Calculator.Computations.Formula import Formula
 from Calculator.Storage import UNIT_REGISTRY
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from Calculator.Utils.Files import read
-from Calculator.CONSTANTS import FORMULAS_FILE, UNITS_FILE, ZERO_TOLERANCE_EXPONENT
-from Calculator.Datum import Datum
+from Calculator.Storage.CONSTANTS import FORMULAS_FILE, UNITS_FILE, DEFAULTS_FILE, ZERO_TOLERANCE_EXPONENT
+from Calculator.Computations.Datum import Datum
 
 
 class LinearIterator:
@@ -11,6 +11,7 @@ class LinearIterator:
         self._formulas = self._load_formulas()
         self._templates = [Formula(f) for f in self.formulas]
         self._temporary_equations = self._templates.copy()
+        self._read_constants()
 
         self._target = None
 
@@ -30,6 +31,12 @@ class LinearIterator:
                 names.append(v)
 
         return names
+
+    def _read_constants(self) -> None:
+        for line in read(DEFAULTS_FILE):
+            var, value = line.strip('\n').split(':')
+            unit = UNIT_REGISTRY[var]
+            self.write(Datum(var, float(value), unit))
 
     def _zte_test(self, zte: int) -> bool:
         if isinstance(zte, int) and 0 < zte < 20:
@@ -118,7 +125,7 @@ class LinearIterator:
             f.consistency_check(raise_exception=True, silent_failure=True)
 
         if self.has_value(self.target.symbol):
-            answer = self.read(self.target.symbol)
+            answer = self.read(self.target.symbol, rounding=False)
             print(answer)
 
             if alter_target:
@@ -211,18 +218,13 @@ class LinearIterator:
                                         f'"{s}"')
         return values
 
-"""
-i = Iterator()
-print('Writing Np...')
-i.write(Datum('Np', 3.01*10**23, 'dimensionless'))
-print('Writing M...')
-i.write(Datum('M', 18, 'g/mole'))
-print('Writing NA...')
-i.write(Datum('NA', 6.02*10**23, '1/mole'))
-print('Setting target to n...')
-i.target = Datum('n', 0.01, 'mole')
+    @property
+    def quantities(self) -> Dict[str, Tuple[float, str]]:
+        # Don't use UnitRegistry, because you cannot operate on units of different ones
+        qs = dict()
 
-print('Solving...')
-i.solve()
-print(i.target)
-"""
+        for var, value in self.values.items():
+            u = UNIT_REGISTRY[var]
+            qs.update( {var : (float(value), u)} )
+
+        return qs

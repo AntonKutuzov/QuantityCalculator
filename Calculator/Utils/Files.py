@@ -1,5 +1,5 @@
 from pathlib import Path
-from Calculator import CONSTANTS
+from Calculator.Storage import CONSTANTS
 
 
 def baseDir() -> Path:
