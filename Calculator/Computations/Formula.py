@@ -2,6 +2,7 @@ from Calculator.Computations.Datum import Datum
 import sympy as sp
 from typing import Dict, Tuple, List
 from Calculator.Storage.CONSTANTS import ZERO_TOLERANCE_EXPONENT
+from Calculator.Commenting import comment
 
 
 class Formula:
@@ -27,16 +28,18 @@ class Formula:
 
         return value_dict
 
-    def _zte_test(self, zte: int) -> bool:
+    @staticmethod
+    def _zte_test(zte: int) -> bool:
         if isinstance(zte, int) and 0 < zte < 20:
             return True
         else:
             return False
 
-    def _is_close(self, num1: float|int, num2: float|int) -> bool:
+    @staticmethod
+    def _is_close(num1: float|int, num2: float|int) -> bool:
         from math import isclose
 
-        if self._zte_test(ZERO_TOLERANCE_EXPONENT):
+        if Formula._zte_test(ZERO_TOLERANCE_EXPONENT):
             zte = eval(f'10e-{ZERO_TOLERANCE_EXPONENT}')
         else:
             raise Exception(f'Invalid ZERO_TOLERANCE_EXPONENT value: {ZERO_TOLERANCE_EXPONENT}')
@@ -48,7 +51,7 @@ class Formula:
 
         for s, v in self.values.items():
             if v is not None:
-                print(v)
+                comment(v)
                 dec = Datum.get_decimals(v)
                 decs.update( {s : dec} )
 
@@ -70,7 +73,7 @@ class Formula:
 
         for s, v in self.values.items():
             if v is None and not silent_failure:
-                print(self.values)
+                comment(self.values)
                 raise Exception(f'Cannot run consistency check for {self.expr}. Not all values are written down.')
             elif v is None and silent_failure:
                 return True
@@ -78,12 +81,12 @@ class Formula:
 
         expr = float(expr)
 
-        if self._is_close(expr, 0):
+        if Formula._is_close(expr, 0):
             return True
         elif not raise_exception:
             return False
         else:
-            print(self.values)
+            comment(self.values)
             raise Exception(f'Inconsistent formula: "{self.expr}" has contradicting values')
 
     def _push(self) -> None:
@@ -243,11 +246,11 @@ f.write(Datum('mps', 5, 'g'))
 f.write(Datum('M', 18, 'g/mole'))
 f.target = Datum('n', 0.001, 'mole')
 
-print(*f.eval())
+comment(*f.eval())
 
-print(f.values)
-print(f.decimals())
-print(f.min_decimals())
+comment(f.values)
+comment(f.decimals())
+comment(f.min_decimals())
 
-print(f.consistency_check())
+comment(f.consistency_check())
 """

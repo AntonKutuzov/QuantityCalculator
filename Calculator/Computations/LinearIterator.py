@@ -4,6 +4,7 @@ from typing import List, Dict, Tuple
 from Calculator.Utils.Files import read
 from Calculator.Storage.CONSTANTS import FORMULAS_FILE, UNITS_FILE, DEFAULTS_FILE, ZERO_TOLERANCE_EXPONENT
 from Calculator.Computations.Datum import Datum
+from Calculator.Commenting import comment
 
 
 class LinearIterator:
@@ -73,19 +74,19 @@ class LinearIterator:
         for f in self._temporary_equations:
             if f.solvable:
                 s = f.unknown
-                print(f'\t\tSolving {f.expr} for {s}:', end=' ')
+                comment(f'\t\tSolving {f.expr} for {s}:', end=' ')
                 u = units_list[s]
                 f.target = Datum(s, 0.001, u)
                 res = f.eval(ignore_failures=True, rounding=False)
 
                 if len(res) > 1:
-                    print(res)
+                    comment(res)
                     raise Exception('Something strange happens...')
                 elif len(res) == 1:
-                    print(f'got {res[0]}')
+                    comment(f'got {res[0]}')
                     interres.append(res[0])
                 else:
-                    print('no numerical result')
+                    comment('no numerical result')
                     continue
 
         return interres
@@ -95,12 +96,12 @@ class LinearIterator:
             raise Exception('Target is not set.')
 
         while True:
-            print('\tComputing, considering new data...')
+            comment('\tComputing, considering new data...')
             res = self._compute_all()
 
-            print('\tINTERMEDIATE: ', *res)
+            comment('\tINTERMEDIATE: ', *res)
 
-            print('\tWriting in new data...')
+            comment('\tWriting in new data...')
             for d in res:
                 self._consistency_check(d.symbol, d.value)
                 self.write(d)
@@ -116,8 +117,8 @@ class LinearIterator:
               ) -> Datum:
 
         for data in self._iterate():
-            print('\tOVERALL:', *data)
-            print('New iteration...')
+            comment('\tOVERALL:', *data)
+            comment('New iteration...')
             if self.target.symbol in [d.symbol for d in data] and stop_at_target:
                 break
 
@@ -126,7 +127,7 @@ class LinearIterator:
 
         if self.has_value(self.target.symbol):
             answer = self.read(self.target.symbol, rounding=False)
-            print(answer)
+            comment(answer)
 
             if alter_target:
                 self.target = answer
@@ -140,13 +141,19 @@ class LinearIterator:
             old = self.values[datum.symbol]
             new = datum.value
             if not self._is_close(old, new):
-                print(self.values)
+                comment(self.values)
                 raise Exception(f'Cannot rewrite the variable: "{datum.symbol}"')
+
+        WROTE = False
 
         self.values.update( {datum.symbol : datum.value} )
         for f in self._temporary_equations:
             if datum.symbol in f.symbols:
+                WROTE = True
                 f.write(datum)
+
+        if not WROTE:
+            raise Exception(f'Variable "{datum.symbol}" is not among the variables of the given formulas set.')
 
     def read(self,
              var: str,
@@ -207,13 +214,13 @@ class LinearIterator:
                 elif values.get(s) is None:
                     values.update( {s : v} )
                 else:
-                    old = f.values[s]
+                    old = values[s]
                     new = v
 
                     if self._is_close(old, new):
                         continue
                     else:
-                        print(f.values)
+                        comment(f.values)
                         raise Exception(f'Found two different values for the same variable: {old} and {new} for variable '
                                         f'"{s}"')
         return values

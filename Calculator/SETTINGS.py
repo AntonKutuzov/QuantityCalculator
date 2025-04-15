@@ -1,4 +1,1 @@
-
-
-class CONSOLE:
-    DISABLE: bool = False
+COMMENTS_ON: bool = False
