@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "QuantityCalculator"
+version = "0.0.5"
+requires-python = ">= 3.12"
+authors = [
+    { name = "Antons Kutuzovs", email = "akutuzovsssss@gmail.com" }
+]
+description = "A package to iteratively solve a system of arbitrary linear equations."
+readme = "README.md"
+license = "GPL-3.0-or-later"
+keywords = ["calculator", "quantity"]
+
+dependencies = [
+    "pint",
+    "sympy"
+]
+
+[project.urls]
+Homepage = "https://github.com/AntonKutuzov/QuantityCalculator"
