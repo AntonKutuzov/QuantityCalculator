@@ -7,6 +7,7 @@ NAMES_FILE: str = 'Storage/Names'
 UNITS_FILE: str = 'Storage/Units'
 DEFAULTS_FILE: str = 'Storage/Defaults'
 ASSUMPTIONS_FILE: str = 'Storage/Assumptions'
+TEMPORARY_FILE: str = 'Storage/temporary_file_for_string_removal'
 
 FILES: tuple = (FORMULAS_FILE, NAMES_FILE, UNITS_FILE, DEFAULTS_FILE, ASSUMPTIONS_FILE)
 

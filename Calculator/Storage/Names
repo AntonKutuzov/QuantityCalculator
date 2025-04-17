@@ -1,27 +1,11 @@
-n:number of moles
-Np:number of particles
-NA:Avogadro constant
-M:molar mass
-mps:mass of pure substance
-Vsm:volume of solid mixture
-C:molar concentration
-T:absolute temperature
-R:universal gas constant
-P:pressure
-Vpg:volume of pure gas
-V0:molar volume of gas
-mpg:mass of pure gas
-ppg:density of pure gas
-Wvv:volume fraction
-mmol:mass of a molecule
-Mel:mass of a single element
-Wel:mass fraction of an element
-Mo:reference mass for relative density
-d:relative density of a gas
-Vps:volume of pure solid
-pps:density of pure solid
-Smsub:sum of masses of all but one substances
-Wmm:mass fraction
-msm:mass of solid mixture
-psm:density of solid mixture
-Vgm:volume of gas mixture
+n:
+Np:
+NA:
+M:
+mps:
+mpg:
+Vsm:
+C:
+V0:
+Vpg:
+Vgm:
