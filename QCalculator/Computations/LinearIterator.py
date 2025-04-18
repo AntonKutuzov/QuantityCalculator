@@ -164,15 +164,16 @@ class LinearIterator:
 
         u = UNIT_REGISTRY[var]
         v = self.values[var]
-
-        if rounding:
-            v = round(v, round_to)
         d = Datum(var, v, u)
 
         if not units == 'default':
-            d.to(units, in_place=True)
+             d.to(units, in_place=True)
+        if rounding:
+            v = round(d.value, round_to)
+        else:
+            v = d.value
 
-        return d
+        return Datum(var, v, d.unit)
 
     def erase(self, var: str) -> None:
         for f in self._temporary_equations:
