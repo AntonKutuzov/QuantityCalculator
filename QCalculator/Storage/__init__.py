@@ -1,5 +1,5 @@
 from QCalculator.Storage.CONSTANTS import UNITS_FILE, NAMES_FILE, DEFAULTS_FILE
-from QCalculator.Storage.Files import read
+from QCalculator.Storage.Files import *
 from warnings import warn
 
 try:
