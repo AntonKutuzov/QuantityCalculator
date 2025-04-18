@@ -71,7 +71,7 @@ def erase(file_name: str) -> None:
     file.close()
 
 
-def _copy(
+def copy(
         from_file: str,
         to_file: str,
         *,
@@ -96,7 +96,7 @@ def remove(file_name: str, line: str) -> None:
     import os
     _file_present_check(file_name)
 
-    _copy(file_name, CONSTANTS.TEMPORARY_FILE, except_lines=(line+'\n',))
-    _copy(CONSTANTS.TEMPORARY_FILE, file_name)
+    copy(file_name, CONSTANTS.TEMPORARY_FILE, except_lines=(line + '\n',))
+    copy(CONSTANTS.TEMPORARY_FILE, file_name)
 
     os.remove(baseDir() / CONSTANTS.TEMPORARY_FILE)
