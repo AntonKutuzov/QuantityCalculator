@@ -159,9 +159,12 @@ class LinearIterator:
              var: str,
              units: str = 'default',
              rounding: bool = True,
-             round_to: int = 2) -> Datum:
+             round_to: int = 2
+             ) -> Datum:
+
         u = UNIT_REGISTRY[var]
         v = self.values[var]
+
         if rounding:
             v = round(v, round_to)
         d = Datum(var, v, u)
