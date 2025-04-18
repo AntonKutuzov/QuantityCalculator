@@ -1,4 +1,4 @@
-from Calculator.SETTINGS import COMMENTS_ON
+from QCalculator.SETTINGS import COMMENTS_ON
 
 
 def comment(*text, end: str = '\n') -> None:

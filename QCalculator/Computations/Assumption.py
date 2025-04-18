@@ -1,8 +1,8 @@
-from Calculator.Computations.LinearIterator import LinearIterator
+from QCalculator.Computations.LinearIterator import LinearIterator
 from typing import List
-from Calculator.Computations.Datum import Datum
-from Calculator.Storage.CONSTANTS import ASSUMPTIONS_FILE
-from Calculator.Utils.Files import write, read
+from QCalculator.Computations.Datum import Datum
+from QCalculator.Storage.CONSTANTS import ASSUMPTIONS_FILE
+from QCalculator.Storage.Files import write, read
 
 
 class Assumption:

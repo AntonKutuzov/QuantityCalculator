@@ -1,5 +1,5 @@
 from pathlib import Path
-from Calculator.Storage import CONSTANTS
+from QCalculator.Storage import CONSTANTS
 from typing import Tuple, Literal
 
 

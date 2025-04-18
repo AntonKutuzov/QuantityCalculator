@@ -1,7 +1,7 @@
-from Calculator.Storage import UNIT_REGISTRY, DEFAULT_VALUES, VARIABLE_NAMES
-from Calculator.Storage.CONSTANTS import FORMULAS_FILE, UNITS_FILE, DEFAULTS_FILE, NAMES_FILE
-from Calculator.Utils import write, remove, find
-from Calculator.Computations import Formula
+from QCalculator.Storage import UNIT_REGISTRY, DEFAULT_VALUES, VARIABLE_NAMES
+from QCalculator.Storage.CONSTANTS import FORMULAS_FILE, UNITS_FILE, DEFAULTS_FILE, NAMES_FILE
+from QCalculator.Utils import write, remove, find
+from QCalculator.Computations import Formula
 from typing import Dict, Any
 
 

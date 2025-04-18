@@ -1,4 +1,4 @@
-PACKAGE_NAME: str = 'Calculator'
+PACKAGE_NAME: str = 'QCalculator'
 
 # ============================================================================================== FILES AND PATHS TO THEM
 # When adding a new file here, don't forget to add its path (variable) to the FILES tuple.
@@ -11,4 +11,5 @@ TEMPORARY_FILE: str = 'Storage/temporary_file_for_string_removal'
 
 FILES: tuple = (FORMULAS_FILE, NAMES_FILE, UNITS_FILE, DEFAULTS_FILE, ASSUMPTIONS_FILE)
 
+# =================================================================================================== SETTINGS CONSTANTS
 ZERO_TOLERANCE_EXPONENT: int = 5

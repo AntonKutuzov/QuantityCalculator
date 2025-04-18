@@ -1,10 +1,10 @@
-from Calculator.Computations.Formula import Formula
-from Calculator.Storage import UNIT_REGISTRY
+from QCalculator.Computations.Formula import Formula
+from QCalculator.Storage import UNIT_REGISTRY
 from typing import List, Dict, Tuple
-from Calculator.Utils.Files import read
-from Calculator.Storage.CONSTANTS import FORMULAS_FILE, UNITS_FILE, DEFAULTS_FILE, ZERO_TOLERANCE_EXPONENT
-from Calculator.Computations.Datum import Datum
-from Calculator.Commenting import comment
+from QCalculator.Storage.Files import read
+from QCalculator.Storage.CONSTANTS import FORMULAS_FILE, UNITS_FILE, DEFAULTS_FILE, ZERO_TOLERANCE_EXPONENT
+from QCalculator.Computations.Datum import Datum
+from QCalculator.Commenting import comment
 
 
 class LinearIterator:

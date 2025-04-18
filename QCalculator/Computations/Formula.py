@@ -1,8 +1,8 @@
-from Calculator.Computations.Datum import Datum
+from QCalculator.Computations.Datum import Datum
 import sympy as sp
 from typing import Dict, Tuple, List
-from Calculator.Storage.CONSTANTS import ZERO_TOLERANCE_EXPONENT
-from Calculator.Commenting import comment
+from QCalculator.Storage.CONSTANTS import ZERO_TOLERANCE_EXPONENT
+from QCalculator.Commenting import comment
 
 
 class Formula:
