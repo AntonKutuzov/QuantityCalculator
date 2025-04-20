@@ -32,7 +32,7 @@ class Datum:
     def __truediv__(self, other) -> Quantity:
         if isinstance(other, Datum):
             return self.quantity / other.quantity
-        elif isinstance(other, Quantity):
+        elif isinstance(other, Quantity|int|float):
             return self.quantity / other
         else:
             raise Exception(f'Unsupported operation: division of Datum by {type(other)}.')
@@ -40,7 +40,7 @@ class Datum:
     def __mul__(self, other) -> Quantity:
         if isinstance(other, Datum):
             return self.quantity * other.quantity
-        elif isinstance(other, Quantity):
+        elif isinstance(other, Quantity|int|float):
             return self.quantity * other
         else:
             raise Exception(f'Unsupported operation: multiplication of Datum by {type(other)}.')
