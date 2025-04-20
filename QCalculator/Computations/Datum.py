@@ -37,6 +37,9 @@ class Datum:
         else:
             raise Exception(f'Unsupported operation: division of Datum by {type(other)}.')
 
+    def __rtruediv__(self, other):
+        return self.__truediv__(other)
+
     def __mul__(self, other) -> Quantity:
         if isinstance(other, Datum):
             return self.quantity * other.quantity
@@ -44,6 +47,9 @@ class Datum:
             return self.quantity * other
         else:
             raise Exception(f'Unsupported operation: multiplication of Datum by {type(other)}.')
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
 
     def __sub__(self, other) -> Quantity:
         if isinstance(other, Datum):
@@ -53,6 +59,9 @@ class Datum:
         else:
             raise Exception(f'Unsupported operation: subtraction of Datum by {type(other)}.')
 
+    def __rsub__(self, other):
+        return self.__sub__(other)
+
     def __add__(self, other) -> Quantity:
         if isinstance(other, Datum):
             return self.quantity + other.quantity
@@ -60,6 +69,9 @@ class Datum:
             return self.quantity + other
         else:
             raise Exception(f'Unsupported operation: multiplication of Datum by {type(other)}.')
+
+    def __radd__(self, other):
+        return self.__add__(other)
 
     def _ZTE_test(self) -> bool:
         zte = self._ZERO_TOLERANCE_EXPONENT
