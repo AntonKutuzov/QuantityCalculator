@@ -3,12 +3,13 @@ from QCalculator import SETTINGS
 from QCalculator.Datum import Datum
 from QCalculator.Commenting import comment
 from typing import List, Dict, Tuple
+from copy import deepcopy
 
 
 class LinearIterator:
     def __init__(self):
-        self._templates = FORMULA_LIST.copy()
-        self._temporary_equations = self._templates.copy()
+        self._templates = deepcopy(FORMULA_LIST)
+        self._temporary_equations = deepcopy(self._templates)
         self._read_constants()
 
         self._target = None
