@@ -14,9 +14,6 @@ class LinearIterator:
 
         self._target = None
 
-        comment(" --- ==== Created new LinearIterator === ---")
-
-
     def _all_symbols(self) -> List[str]:
         names = list()
 
@@ -102,8 +99,8 @@ class LinearIterator:
                 return res
 
     def solve(self,
-              stop_at_target: bool = True,
-              alter_target: bool = True,
+                  stop_at_target: bool = True,
+                  alter_target: bool = True,
               ) -> Datum:
 
         for data in self._iterate():
