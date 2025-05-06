@@ -9,7 +9,7 @@ from copy import deepcopy
 class LinearIterator:
     def __init__(self):
         self._templates = deepcopy(FORMULA_LIST)
-        self._temporary_equations = deepcopy(self._templates)
+        self._temporary_equations = self._templates.copy()
         self._read_constants()
 
         self._target = None
