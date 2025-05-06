@@ -1,8 +1,8 @@
-from QCalculator.SETTINGS import COMMENTS_ON
+from QCalculator._settings import SETTINGS
 
 
 def comment(*text, end: str = '\n') -> None:
-    if COMMENTS_ON:
+    if SETTINGS['COMMENTS ON']:
         print(*text, end=end)
     else:
         pass
