@@ -1,28 +1,18 @@
-from QCalculator.Computations.Formula import Formula
-from QCalculator.Storage import UNIT_REGISTRY
-from typing import List, Dict, Tuple
-from QCalculator.Storage.Files import read
-from QCalculator.Storage.CONSTANTS import FORMULAS_FILE, UNITS_FILE, DEFAULTS_FILE, ZERO_TOLERANCE_EXPONENT
-from QCalculator.Computations.Datum import Datum
+from QCalculator.database import UNIT_REGISTRY, FORMULA_LIST
+from QCalculator import SETTINGS
+from QCalculator.Datum import Datum
 from QCalculator.Commenting import comment
+from typing import List, Dict, Tuple
 
 
 class LinearIterator:
     def __init__(self):
-        self._formulas = self._load_formulas()
-        self._templates = [Formula(f) for f in self.formulas]
+        self._templates = FORMULA_LIST.copy()
         self._temporary_equations = self._templates.copy()
         self._read_constants()
 
         self._target = None
 
-    def _load_formulas(self) -> List[str]:
-        formulas = list()
-
-        for line in read(FORMULAS_FILE):
-            formulas.append(line)
-
-        return formulas
 
     def _all_symbols(self) -> List[str]:
         names = list()
@@ -34,10 +24,7 @@ class LinearIterator:
         return names
 
     def _read_constants(self) -> None:
-        for line in read(DEFAULTS_FILE):
-            var, value = line.strip('\n').split(':')
-            unit = UNIT_REGISTRY[var]
-            self.write(Datum(var, float(value), unit))
+        pass
 
     def _zte_test(self, zte: int) -> bool:
         if isinstance(zte, int) and 0 < zte < 20:
@@ -47,6 +34,7 @@ class LinearIterator:
 
     def _is_close(self, num1: float|int, num2: float|int) -> bool:
         from math import isclose
+        ZERO_TOLERANCE_EXPONENT = SETTINGS['ZERO TOLERANCE EXPONENT']
 
         if self._zte_test(ZERO_TOLERANCE_EXPONENT):
             zte = eval(f'10e-{ZERO_TOLERANCE_EXPONENT}')
@@ -69,13 +57,12 @@ class LinearIterator:
 
     def _compute_all(self) -> List[Datum]:
         interres = list()
-        units_list = dict([ u.split(':') for u in read(UNITS_FILE) ])
 
         for f in self._temporary_equations:
             if f.solvable:
                 s = f.unknown
                 comment(f'\t\tSolving {f.expr} for {s}:', end=' ')
-                u = units_list[s]
+                u = UNIT_REGISTRY[s]
                 f.target = Datum(s, 0.001, u)
                 res = f.eval(ignore_failures=True, rounding=False)
 
@@ -194,7 +181,12 @@ class LinearIterator:
 
     @property
     def formulas(self) -> List[str]:
-        return self._formulas
+        formula_list = list()
+
+        for f in self._templates:
+            formula_list.append(f.expr)
+
+        return formula_list
 
     @property
     def target(self) -> Datum:

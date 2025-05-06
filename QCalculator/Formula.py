@@ -1,7 +1,7 @@
-from QCalculator.Computations.Datum import Datum
+from QCalculator.Datum import Datum
 import sympy as sp
 from typing import Dict, Tuple, List
-from QCalculator.Storage.CONSTANTS import ZERO_TOLERANCE_EXPONENT
+from QCalculator._settings import SETTINGS
 from QCalculator.Commenting import comment
 
 
@@ -38,6 +38,7 @@ class Formula:
     @staticmethod
     def _is_close(num1: float|int, num2: float|int) -> bool:
         from math import isclose
+        ZERO_TOLERANCE_EXPONENT = SETTINGS['ZERO TOLERANCE EXPONENT']
 
         if Formula._zte_test(ZERO_TOLERANCE_EXPONENT):
             zte = eval(f'10e-{ZERO_TOLERANCE_EXPONENT}')
