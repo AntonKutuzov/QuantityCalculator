@@ -9,10 +9,12 @@ from copy import deepcopy
 class LinearIterator:
     def __init__(self):
         self._templates = deepcopy(FORMULA_LIST)
-        self._temporary_equations = self._templates.copy()
+        self._temporary_equations = deepcopy(self._templates)
         self._read_constants()
 
         self._target = None
+
+        comment(" --- ==== Created new LinearIterator === ---")
 
 
     def _all_symbols(self) -> List[str]:
@@ -168,7 +170,7 @@ class LinearIterator:
             f.erase(var)
 
     def clear(self) -> None:
-        self._temporary_equations = self._templates.copy()
+        self._temporary_equations = deepcopy(self._templates)
 
     def has_value(self, name: str) -> bool:
         names = list()
