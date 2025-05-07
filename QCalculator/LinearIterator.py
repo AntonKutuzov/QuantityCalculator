@@ -172,7 +172,7 @@ class LinearIterator:
     def has_value(self, name: str) -> bool:
         names = list()
 
-        for f in self._templates:
+        for f in self._temporary_equations:
             for v, n in f.values.items():
                 if n is not None:
                     names.append(v)
