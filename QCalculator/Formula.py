@@ -107,7 +107,7 @@ class Formula:
         else:
             return None
 
-    def erase(self, symbol) -> None:
+    def erase(self, symbol: str) -> None:
         s = sp.Symbol(symbol)
 
         self._values[s] = None
