@@ -174,10 +174,10 @@ class LinearIterator:
 
         for f in self._temporary_equations:
             for v, n in f.values.items():
-                if n is not None:
+                if n is not None and v not in names:
                     names.append(v)
 
-        return name in set(names)
+        return name in names
 
     @property
     def formulas(self) -> List[str]:
