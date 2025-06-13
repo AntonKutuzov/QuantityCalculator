@@ -1,5 +1,5 @@
 from __future__ import annotations
-from pint import Quantity, Unit, UnitRegistry
+from pint import Quantity, UnitRegistry
 
 
 class Datum:
@@ -8,7 +8,7 @@ class Datum:
 
         self._symbol = symbol
         self._value = value
-        self._unit = self._ureg.Unit(unit)
+        self._unit = self._ureg.parse_units(unit)
         self._base_unit = (1*self._unit).to_base_units().units
 
         self._ZERO_TOLERANCE_EXPONENT = 3
@@ -103,16 +103,14 @@ class Datum:
 
     # =================================================================================================== changing value
     def to(self, unit: str, in_place: bool = False) -> Datum:
-        u = self._ureg.Unit(unit)
+        u = self._ureg.parse_units(unit)
         q = self.quantity
-        new_q = q.to(u)
 
-        """
         if q.is_compatible_with(u):
             new_q = q.to(u)
         else:
             raise Exception(f'Incompatible units: "{self.unit}" and "{unit}"')
-        """
+
         if in_place:
             self._value = new_q.magnitude
             self._unit = new_q.units
@@ -125,7 +123,7 @@ class Datum:
     # ======================================================================================================= properties
     @property
     def quantity(self) -> Quantity:
-        return self._value * Unit(self._unit)
+        return self._value * self._ureg.parse_units(self._unit)
 
     @property
     def symbol(self) -> str:
