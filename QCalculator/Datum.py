@@ -105,12 +105,14 @@ class Datum:
     def to(self, unit: str, in_place: bool = False) -> Datum:
         u = self._ureg.Unit(unit)
         q = self.quantity
+        new_q = q.to(u)
 
+        """
         if q.is_compatible_with(u):
             new_q = q.to(u)
         else:
             raise Exception(f'Incompatible units: "{self.unit}" and "{unit}"')
-
+        """
         if in_place:
             self._value = new_q.magnitude
             self._unit = new_q.units
