@@ -3,12 +3,14 @@ from pint import Quantity, UnitRegistry
 
 
 class Datum:
+    ureg = UnitRegistry(system='SI')
+
     def __init__(self, symbol: str, value: float|int, unit: str):
-        self._ureg = UnitRegistry(system='SI')
+        self._ureg = Datum.ureg
 
         self._symbol = symbol
         self._value = value
-        self._unit = self._ureg.parse_units(unit)
+        self._unit = self._ureg.Unit(unit)
         self._base_unit = (1*self._unit).to_base_units().units
 
         self._ZERO_TOLERANCE_EXPONENT = 3
@@ -103,7 +105,7 @@ class Datum:
 
     # =================================================================================================== changing value
     def to(self, unit: str, in_place: bool = False) -> Datum:
-        u = self._ureg.parse_units(unit)
+        u = self._ureg.Unit(unit)
         q = self.quantity
 
         if q.is_compatible_with(u):
@@ -123,7 +125,7 @@ class Datum:
     # ======================================================================================================= properties
     @property
     def quantity(self) -> Quantity:
-        return self._value * self._ureg.parse_units(self._unit)
+        return self._value * self._ureg.Unit(self._unit)
 
     @property
     def symbol(self) -> str:
