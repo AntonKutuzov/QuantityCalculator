@@ -161,4 +161,4 @@ Currently, the code is still being developed, and is not final. Thus, bugs and e
 
 If you ever found bugs or ways to improve the code, feel free to contact the author.
 
-Please note that the author of these lines is not a professional coder, rather an amateur. So, be cautious when using this code as I might have missed something. Still, if you ever used the code in any of your projects, I would love to see its implementation (although, this is not a must, of course.)
+Please note that the author of these lines is not a professional coder, rather an amateur. So, be cautious when using this code as I might have missed something. Still, if you ever used the code in any of your projects, I would love to see its use (although, this is not a must, of course.)
