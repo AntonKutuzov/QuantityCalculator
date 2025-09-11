@@ -156,9 +156,9 @@ The solution is:  w = 5.85 percent
 ```
 
 # Notes
-Currently, the code is still being developed, and it not final. Thus, bugs and errors may occur. Also, the author is aware of how inconvenient it is to write so much lines of code.
+Currently, the code is still being developed, and is not final. Thus, bugs and errors may occur. Also, the author is aware of how inconvenient it is to write so much lines of code.
  The code will become more convenient to use later.
 
 If you ever found bugs or ways to improve the code, feel free to contact the author.
 
-If you used the code in any of your projects, I would love to see its implementation (although, this is not a must, of course.)
+Please note that the author of these lines is not a professional coder, rather an amateur. So, be cautious when using this code as I might have missed something. Still, if you ever used the code in any of your projects, I would love to see its implementation (although, this is not a must, of course.)
