@@ -3,6 +3,7 @@ import sympy as sp
 from typing import Dict, Tuple, List
 from QCalculator._settings import SETTINGS
 from QCalculator.Commenting import comment
+from QCalculator.Exceptions.FormulaExceptions import *
 
 
 class Formula:
@@ -43,7 +44,7 @@ class Formula:
         if Formula._zte_test(ZERO_TOLERANCE_EXPONENT):
             zte = eval(f'10e-{ZERO_TOLERANCE_EXPONENT}')
         else:
-            raise Exception(f'Invalid ZERO_TOLERANCE_EXPONENT value: {ZERO_TOLERANCE_EXPONENT}')
+            raise InvalidZeroToleranceExponent(value=ZERO_TOLERANCE_EXPONENT, comment='')
 
         return isclose(num1, num2, abs_tol=zte)
 
@@ -75,7 +76,7 @@ class Formula:
         for s, v in self.values.items():
             if v is None and not silent_failure:
                 comment(self.values)
-                raise Exception(f'Cannot run consistency check for {self.expr}. Not all values are written down.')
+                raise CannotRunConsistencyCheck(formula=self.expr, comment='')
             elif v is None and silent_failure:
                 return True
             expr = expr.subs(s, v)
@@ -88,7 +89,7 @@ class Formula:
             return False
         else:
             comment(self.values)
-            raise Exception(f'Inconsistent formula: "{self.expr}" has contradicting values')
+            raise InconsistentFormula(formula=self.expr, comment='')
 
     def _push(self) -> None:
         for s, v in self.values.items():
@@ -131,7 +132,7 @@ class Formula:
              ) -> List[Datum]:
 
         if self._target is None:
-            raise Exception('specify target variable.')
+            raise TargetNotFound(comment='specify target variable.', formula=self.expr)
 
         self._push()
         symbol = sp.Symbol(self.target)
@@ -160,7 +161,7 @@ class Formula:
                     data.append(solution)
 
         if not data and not ignore_failures:
-            raise Exception('Could not find any solutions.')
+            raise SolutionNotFound(comment='Could not find any solutions.', formula=self.expr)
 
         self._tempex = self._expression
         self._target = None
@@ -194,7 +195,7 @@ class Formula:
                 if n is None:
                     return str(v)
         else:
-            raise Exception('Equation must be solvable to use this method')
+            raise EquationNotSolvable(comment='Equation must be solvable to use this method ("Formula.unknown()").', formula=self.expr)
 
 
     @property

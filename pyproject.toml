@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "QuantityCalculator"
-version = "2.1.5"  # big refactoring and improvements . adding new features . bug fixing
+version = "2.2.5"  # big refactoring and improvements . adding new features . bug fixing
 requires-python = ">= 3.12"
 authors = [
     { name = "Antons Kutuzovs", email = "akutuzovsssss@gmail.com" }
@@ -12,7 +12,7 @@ authors = [
 description = "A package to iteratively solve a system of arbitrary linear equations."
 readme = "README.md"
 license = "GPL-3.0-or-later"
-keywords = ["calculator", "quantity", "units"]
+keywords = ["calculator", "quantity", "units", "system"]
 
 dependencies = [
     "pint",

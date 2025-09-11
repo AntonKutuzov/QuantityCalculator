@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pint import Quantity, UnitRegistry
+from QCalculator.Exceptions.DatumExceptions import *
 
 
 class Datum:
@@ -22,7 +23,7 @@ class Datum:
         from math import isclose
 
         if not self._ZTE_test():
-            raise Exception()
+            raise InvalidZeroToleranceExponent(value=self._ZERO_TOLERANCE_EXPONENT)
 
         conditions = (
             self.symbol == other._symbol,
@@ -47,7 +48,9 @@ class Datum:
         elif isinstance(other, Quantity|int|float):
             return self.quantity / other
         else:
-            raise Exception(f'Unsupported operation: division of Datum by {type(other)}.')
+            raise UnsupportedOperation(f'Unsupported operation: division.',
+                                       other_type=str(type(other))
+                                       )
 
     def __rtruediv__(self, other) -> Quantity:
         return self.__truediv__(other)
@@ -58,7 +61,9 @@ class Datum:
         elif isinstance(other, Quantity|int|float):
             return self.quantity * other
         else:
-            raise Exception(f'Unsupported operation: multiplication of Datum by {type(other)}.')
+            raise UnsupportedOperation(f'Unsupported operation: multiplication.',
+                                       other_type=str(type(other))
+                                       )
 
     def __rmul__(self, other) -> Quantity:
         return self.__mul__(other)
@@ -69,7 +74,9 @@ class Datum:
         elif isinstance(other, Quantity):
             return self.quantity - other
         else:
-            raise Exception(f'Unsupported operation: subtraction of Datum by {type(other)}.')
+            raise UnsupportedOperation(f'Unsupported operation: subtraction.',
+                                       other_type=str(type(other))
+                                       )
 
     def __rsub__(self, other) -> Quantity:
         return self.__sub__(other)
@@ -80,7 +87,9 @@ class Datum:
         elif isinstance(other, Quantity):
             return self.quantity + other
         else:
-            raise Exception(f'Unsupported operation: multiplication of Datum by {type(other)}.')
+            raise UnsupportedOperation(f'Unsupported operation: addition.',
+                                       other_type=str(type(other))
+                                       )
 
     def __radd__(self, other) -> Quantity:
         return self.__add__(other)
@@ -89,7 +98,7 @@ class Datum:
     @staticmethod
     def get_decimals(value: float) -> int:
         if value == 0.0:
-            raise Exception('Cannot determine decimal digits from a value of 0.')
+            raise CannotDetermineSignificantDigits('Cannot determine significant digits.', number=value)
 
         str_value = str(float(value))
 
@@ -111,7 +120,7 @@ class Datum:
         if q.is_compatible_with(u):
             new_q = q.to(u)
         else:
-            raise Exception(f'Incompatible units: "{self.unit}" and "{unit}"')
+            raise IncompatibleUnits(comment='', from_unit=self.unit, to_uint=unit)
 
         if in_place:
             self._value = new_q.magnitude

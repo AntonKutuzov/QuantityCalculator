@@ -2,6 +2,7 @@ from QCalculator.database import UNIT_REGISTRY, FORMULA_LIST
 from QCalculator import SETTINGS
 from QCalculator.Datum import Datum
 from QCalculator.Commenting import comment
+from QCalculator.Exceptions.LinearIteratorExceptions import *
 from typing import List, Dict, Tuple
 from copy import deepcopy
 
@@ -39,7 +40,7 @@ class LinearIterator:
         if self._zte_test(ZERO_TOLERANCE_EXPONENT):
             zte = eval(f'10e-{ZERO_TOLERANCE_EXPONENT}')
         else:
-            raise Exception(f'Invalid ZERO_TOLERANCE_EXPONENT value: {ZERO_TOLERANCE_EXPONENT}')
+            raise InvalidZeroToleranceExponent(comment='', value=ZERO_TOLERANCE_EXPONENT)
 
         return isclose(num1, num2, abs_tol=zte)
 
@@ -51,7 +52,7 @@ class LinearIterator:
             d = self.read(var, rounding=False)
 
             if not self._is_close(d.value, value):
-                raise Exception(f'Inconsistent variable: "{var}" has unequal values of {d.value} and {value}')
+                raise InconsistentVariable(comment=f'The values are {d.value} and {value}', var=var, v1=value, v2=d.value)
         else:
             return True
 
@@ -80,7 +81,7 @@ class LinearIterator:
 
     def _iterate(self) -> List[Datum]:
         if self.target is None:
-            raise Exception('Target is not set.')
+            raise TargetNotFound(comment='Specify the target Datum for the linear iterator.')
 
         while True:
             comment('\tComputing, considering new data...')
@@ -101,6 +102,7 @@ class LinearIterator:
     def solve(self,
                   stop_at_target: bool = True,
                   alter_target: bool = True,
+                  rounding: bool = False
               ) -> Datum:
 
         for data in self._iterate():
@@ -113,7 +115,12 @@ class LinearIterator:
             f.consistency_check(raise_exception=True, silent_failure=True)
 
         if self.has_value(self.target.symbol):
-            answer = self.read(self.target.symbol, rounding=False)
+            answer = self.read(
+                self.target.symbol,
+                rounding=rounding,
+                units=self.target.unit,
+                round_to=self.target.num_decimals
+            )
             comment(answer)
 
             if alter_target:
@@ -121,7 +128,7 @@ class LinearIterator:
 
             return answer
         else:
-            raise Exception('Could not find the solution.')
+            raise SolutionNotFound(comment='')
 
     def write(self, datum: Datum) -> None:
         if self.has_value(datum.symbol):
@@ -129,7 +136,7 @@ class LinearIterator:
             new = datum.value
             if not self._is_close(old, new):
                 comment(self.values)
-                raise Exception(f'Cannot rewrite the variable: "{datum.symbol}"')
+                raise CannotRewriteVariable(comment='', var=datum.symbol, old_value=old, new_value=datum.value)
 
         WROTE = False
 
@@ -140,7 +147,7 @@ class LinearIterator:
                 f.write(datum)
 
         if not WROTE:
-            raise Exception(f'Variable "{datum.symbol}" is not among the variables of the given formulas set.')
+            raise VariableNotFound(comment='', var=datum.symbol)
 
     def read(self,
              var: str,
@@ -197,7 +204,7 @@ class LinearIterator:
         if self._test_var_presence(value.symbol):
             self._target = value
         else:
-            raise Exception(f'Variable not found in Formulas file: {value.symbol}')
+            raise VariableNotFound(comment='', var=value.symbol)
 
     @property
     def values(self) -> Dict[str, float|int]:
@@ -217,8 +224,7 @@ class LinearIterator:
                         continue
                     else:
                         comment(f.values)
-                        raise Exception(f'Found two different values for the same variable: {old} and {new} for variable '
-                                        f'"{s}"')
+                        raise InconsistentVariable(comment='', var=s, v1=v, v2=old)
         return values
 
     @property
