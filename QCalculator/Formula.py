@@ -89,7 +89,7 @@ class Formula:
             return False
         else:
             comment(self.values)
-            raise InconsistentFormula(formula=self.expr, comment='')
+            raise InconsistentFormula(formula=self.expr, comment=f'{self.values}')
 
     def _push(self) -> None:
         for s, v in self.values.items():
