@@ -2,6 +2,7 @@ from __future__ import annotations
 from pint import Quantity, UnitRegistry
 from QCalculator.Exceptions.DatumExceptions import *
 
+from typing import Optional
 
 class Datum:
     ureg = UnitRegistry(system='SI')
@@ -113,7 +114,7 @@ class Datum:
             return len(decimals)
 
     # =================================================================================================== changing value
-    def to(self, unit: str, in_place: bool = False) -> Datum:
+    def to(self, unit: str, in_place: bool = False) -> Optional[Datum]:
         u = self._ureg.Unit(unit)
         q = self.quantity
 
@@ -130,6 +131,13 @@ class Datum:
 
     def to_base_units(self, in_place: bool = False) -> Datum:
         return self.to(self.base_unit, in_place=in_place)
+
+    def scale(self, factor: float|int, in_place: bool = False) -> Optional[Datum]:
+        if in_place:
+            self._value = factor*self._value
+            return None
+        else:
+            return Datum(self.symbol, self.value*factor, self.unit)
 
     # ======================================================================================================= properties
     @property
@@ -155,3 +163,9 @@ class Datum:
     @property
     def num_decimals(self) -> int:
         return self.get_decimals(self.value)
+
+
+if __name__ == '__main__':
+    d = Datum('m', 10, 'g')
+    print(d*2)
+    print(d.scale(2))
