@@ -3,8 +3,10 @@ from QCalculator import SETTINGS
 from QCalculator.Datum import Datum
 from QCalculator.Commenting import comment
 from QCalculator.Exceptions.LinearIteratorExceptions import *
+
 from typing import List, Dict, Tuple
 from copy import deepcopy
+from pint import Unit
 
 
 class LinearIterator:
@@ -132,8 +134,8 @@ class LinearIterator:
 
     def write(self, datum: Datum) -> None:
         d = datum.to_base_units()
-        if not d.unit == UNIT_REGISTRY[datum.symbol]:
-            raise Exception(f'Variable {datum.symbol} cannot have units {datum.unit}.')
+        if not Unit(d.unit).is_compatible_with(Unit(UNIT_REGISTRY[datum.symbol])):
+            raise Exception(f'Variable "{datum.symbol}" cannot have units "{datum.unit}".')
 
         if self.has_value(datum.symbol):
             old = self.values[datum.symbol]
