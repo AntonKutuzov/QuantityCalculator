@@ -167,5 +167,5 @@ class Datum:
 
 if __name__ == '__main__':
     d = Datum('m', 10, 'g')
-    print(d*2)
-    print(d.scale(2))
+    q = 5*Datum.ureg.L
+    print(q / d)

@@ -131,6 +131,10 @@ class LinearIterator:
             raise SolutionNotFound(comment='')
 
     def write(self, datum: Datum) -> None:
+        d = datum.to_base_units()
+        if not d.unit == UNIT_REGISTRY[datum.symbol]:
+            raise Exception(f'Variable {datum.symbol} cannot have units {datum.unit}.')
+
         if self.has_value(datum.symbol):
             old = self.values[datum.symbol]
             new = datum.value
