@@ -23,6 +23,10 @@ class InconsistentFormula(FormulaException):
         self._message = f'The formula  {formula} is inconsistent. It has contradicting values.'
         super().__init__(self._message, comment)
 
+class RewritingError(FormulaException):
+    def __init__(self, comment: str, variable: str, old_value: str, old_units: str):
+        self._message = f'Cannot rewrite variable "{variable}". Current value: {old_value} {old_units}.'
+        super().__init__(self._message, comment)
 
 class TargetNotFound(FormulaException):
     def __init__(self, comment: str, formula: str):

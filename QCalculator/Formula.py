@@ -125,13 +125,16 @@ class Formula:
 
         if symbol in self.values:
             if self.has_value(symbol) and not rewrite:
-                raise Exception(
-                    f'Cannot rewrite the variable "{symbol}". Current value: {self._values[symbol]} {self._units[symbol]}.'
-                    f'\nSet rewrite=True to overrule this restriction. NOTE: the formula may become inconsistent.')
+                raise RewritingError(
+                    comment='Set rewrite=True to overrule this restriction. NOTE: the formula may become inconsistent.',
+                    variable=symbol,
+                    old_value=str(self._values[symbol]),
+                    old_units=str(self._units[symbol])
+                )
             self._values[symbol] = datum.value
             self._units[symbol] = datum.units
         else:
-            raise Exception(f'The variable with symbol "{symbol}" is not present in the expression: {self.expr}.')
+            raise VariableNotFound(comment=f'The variable is not present in the expression: {self.expr}.', var=symbol)
 
     def read(self, var: str, units: str | Datum.ureg.Unit = 'auto') -> Datum:
         value = self._values[var]
