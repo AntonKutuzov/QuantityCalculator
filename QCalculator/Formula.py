@@ -1,258 +1,312 @@
-from QCalculator.Datum import Datum
+from __future__ import annotations
+
 import sympy as sp
-from typing import Dict, Tuple, List
-from QCalculator._settings import SETTINGS
-from QCalculator.Commenting import comment
+from sympy.parsing.sympy_parser import parse_expr
+from sympy import I, Expr
+from typing import Dict, Tuple, List, Optional
+
+from QCalculator.Datum import Datum
 from QCalculator.Exceptions.FormulaExceptions import *
+from QCalculator.Exceptions.LinearIteratorExceptions import VariableNotFound
 
 
 class Formula:
-    def __init__(self, expr: str):
-        self._target = None
-        self._rounding = None
-        self._return_units = None
+    """
+    Formulas class allows to join together several Datum instances with a simple mathematical relation. For example,
+    S=v*t joins three Datum instances. The Formula then allows to write down two of the three variables and solve for
+    the missing one by using .write and .eval. The class uses sympy and Datum .symbol attributes to operate on the
+    formula.
+    """
 
-        self._expression = sp.parse_expr(expr)
-        self._tempex = sp.parse_expr(expr)
-        self._symbols = self._expression.free_symbols
-        self._values = self._generate_value_dict()
-        self._units = dict()
+    def __init__(self, expr: str) -> None:
+        self._target: Optional[str] = None
+        self._rounding: Optional[int] = None
+        self._return_units: Optional[Datum.ureg.Unit] = None
+
+        self._expression = parse_expr(expr)
+        self._tempex = parse_expr(expr)
+        self._symbols = self.expr.free_symbols
+        self._values: Dict[str, Optional[int|float]] = dict([(s, None) for s in self.symbols])
+        self._units: Dict[str, Datum.ureg.Unit] = dict()
+        self._ZERO_TOLERANCE_EXPONENT: int = 7
 
     def __str__(self):
         return str(self._tempex)
 
-    def _generate_value_dict(self) -> Dict[sp.Symbol, float|int|None]:
-        value_dict = dict()
-
-        for symbol in self._symbols:
-            value_dict.update({symbol : None})
-
-        return value_dict
+    def __iter__(self):
+        return self.symbols.__iter__()
 
     @staticmethod
-    def _zte_test(zte: int) -> bool:
-        if isinstance(zte, int) and 0 < zte < 20:
-            return True
-        else:
-            return False
-
-    @staticmethod
-    def _is_close(num1: float|int, num2: float|int) -> bool:
+    def _is_close(num1: float|int, num2: float|int, zte: int = 3) -> bool:
         from math import isclose
-        ZERO_TOLERANCE_EXPONENT = SETTINGS['ZERO TOLERANCE EXPONENT']
 
-        if Formula._zte_test(ZERO_TOLERANCE_EXPONENT):
-            zte = eval(f'10e-{ZERO_TOLERANCE_EXPONENT}')
-        else:
-            raise InvalidZeroToleranceExponent(value=ZERO_TOLERANCE_EXPONENT, comment='')
+        if not Datum._ZTE_test(zte):
+            raise InvalidZeroToleranceExponent(value=zte, comment='')
 
-        return isclose(num1, num2, abs_tol=zte)
+        # print(num1, num2, zte, eval(f"10e-{zte}"))
+        return isclose(num1, num2, abs_tol=eval(f"10e-{zte}"))
 
     def decimals(self) -> Dict[str, int]:
-        decs = dict()
+        return dict([(s, Datum.get_decimals(v)) for s, v in self.values.items() if v is not None])
 
-        for s, v in self.values.items():
-            if v is not None:
-                comment(v)
-                dec = Datum.get_decimals(v)
-                decs.update( {s : dec} )
-
-        return decs
-
-    def min_decimals(self, only_number: bool = False) -> int | Dict[str, int]:
+    def min_decimals(self, only_number: bool = False) -> int | Tuple[str, int]:
         decs = self.decimals()
-        min_value = min(decs.values())
+        min_pair = min(decs.items(), key=lambda i: i[1])
 
-        for s, v in decs.items():
-            if v == min_value:
-                if only_number:
-                    return v
-                else:
-                    return {s : v}
+        if only_number:
+            return min_pair[1]
+        else:
+            return min_pair
 
-    def consistency_check(self, raise_exception: bool = True, silent_failure: bool = False) -> bool:
-        expr = self._expression.copy()
+    def consistency_check(self,
+                              raise_exception: bool = True,
+                              silent_failure: bool = False,
+                              zte: Optional[int] = None,
+                          ) -> bool:
+        """
+        .consistency_check() checks if the values written into a formula still obey that formula. Let's say, if the
+        Formula instance describes a Pythagorean theorem, c**2 = a**2 + b**2, then writing in a=3, b=4, c=5 will pass
+        the consistency check since 5**2 - 3**2 - 4**2 = 0. If, however, c=6, then the consistency check would raise
+        an exception (unless manually disabled via raise_exception=True) because 6**2 - 3**2 - 4**2 < 0.
 
+        Of course, if not all numbers are written to the Formula instance, consistency check cannot be ran. If no
+        exception is needed when the test cannot be ran, set silent_failure to True.
+
+        :param raise_exception: bool = True. Raise exception if the test is failed. Otherwise, return False.
+        :param silent_failure: bool = False. Raise exception if the test cannot be ran.
+        :param zte: the zero tolerance exponent. If None, the default value is used.
+        :return: bool. True is the formula is consistent False if not.
+        """
+
+
+        expr = self.expr  # the .expr property itself creates a copy of the sympy expression
+
+        # writing in the saved values for each symbol (or complaining if no value is found).
         for s, v in self.values.items():
-            if v is None and not silent_failure:
-                comment(self.values)
-                raise CannotRunConsistencyCheck(formula=self.expr, comment='')
-            elif v is None and silent_failure:
-                return True
-            expr = expr.subs(s, v)
+            if v is None:
+                if not silent_failure:
+                    raise CannotRunConsistencyCheck(formula=self.expr_str, comment='')
+                else:
+                    return True
+            else:
+                expr = expr.subs(s, v)
 
+        # we are here only if all values were present, so our expression is not a number
         expr = float(expr)
 
-        if Formula._is_close(expr, 0):
+        # check with ._is_close() whether the number is close to zero
+        if zte is None:
+            zte = self._ZERO_TOLERANCE_EXPONENT
+
+        if self._is_close(expr, 0, zte=zte):
             return True
         elif not raise_exception:
             return False
         else:
-            comment(self.values)
-            raise InconsistentFormula(formula=self.expr, comment=f'{self.values}')
+            raise InconsistentFormula(formula=self.expr_str, comment=f'{self.values}')
 
     def _push(self) -> None:
         for s, v in self.values.items():
             if v is not None:
                 self._tempex = self._tempex.subs(s, v)
 
-    def write(self, datum: Datum) -> None:
-        datum = datum.to_base_units()
-        symbol = datum.symbol
-        value = datum.value
-        s = sp.Symbol(symbol)
+    def _symbol_check(self, symbol: str) -> bool:
+        """Checks if the symbol is present in the formula's expression"""
+        return symbol in self.symbols
 
-        if s in self._values:
-            self._values[s] = value
-            self._units[s] = datum.unit
+    def write(self,
+                  d: Datum | str,
+                  rewrite: bool = False
+              ) -> None:
+
+        datum = Datum.to_datum(d)
+        symbol = datum.symbol
+        datum.ito_base_units()
+
+        if symbol in self.values:
+            if self.has_value(symbol) and not rewrite:
+                raise Exception(
+                    f'Cannot rewrite the variable "{symbol}". Current value: {self._values[symbol]} {self._units[symbol]}.'
+                    f'\nSet rewrite=True to overrule this restriction. NOTE: the formula may become inconsistent.')
+            self._values[symbol] = datum.value
+            self._units[symbol] = datum.units
         else:
-            return None
+            raise Exception(f'The variable with symbol "{symbol}" is not present in the expression: {self.expr}.')
+
+    def read(self, var: str, units: str | Datum.ureg.Unit = 'auto') -> Datum:
+        value = self._values[var]
+        base_units = self._units[var]
+
+        if units == 'auto':
+            units = base_units
+
+        return Datum(var, value, base_units).to(units)
 
     def erase(self, symbol: str) -> None:
-        s = sp.Symbol(symbol)
-
-        self._values[s] = None
-        self._units[s] = None
+        if self.has_value(symbol):
+            self._values[symbol] = None
+            self._units[symbol] = None
+        else:
+            raise VariableNotFound(comment='', var=symbol)
 
     def has_value(self, var: str) -> bool:
-        s = sp.Symbol(var)
-
-        if self._values.get(s) is not None:
-            return True
-        else:
-            return False
+        return self._values.get(var) is not None
 
     def eval(self,
              *,
              drop_negatives: bool = False,
              drop_complex: bool = False,
              ignore_failures: bool = False,
-             return_all: bool = False,
+             num_only: bool = False,
              rounding: bool = True,
-             ) -> List[Datum]:
+             write_target: bool = False,
+             reset_target: bool = False
+             ) -> List[Datum | Expr]:
+        """
+        .eval() returns a list of solutions (solves using sympy) for a given variable. Those may include numerical
+        solutions if self.solvable is True, or sympy expressions if there were not enough variables provided to
+        solve for the required variable.
 
-        if self._target is None:
-            raise TargetNotFound(comment='specify target variable.', formula=self.expr)
+        By combining "write_target" and "reset_target" each Formula instance can be used to preserve the obtained
+        values of the target variable (single-time solution) or to solve for the same target many times.
 
+        :param drop_negatives: If True, no negative numerical solutions will be returned
+        :param drop_complex: If True, no complex or imaginary solutions will be returned
+        :param ignore_failures: if True, even an empty list of solutions will be returned
+        :param num_only: If True, only numerical solutions (float and int) will be returned
+        :param rounding: If True, the numerical solutions will be rounded to the number of digits indicated in self.target Datum instance
+        :param write_target: If True, the obtained value of the target variable is recorded by .write(). Useful for linear equations with one solution
+        :param reset_target: If True, the .target variable is set back to None
+        :return: A list of Datum objects for numerical solutions and sympy Expr objects for other solutions.
+        """
+
+        # if there's no target specified, it makes no sense to continue
+        if self.target is None:
+            raise TargetNotFound(comment='specify target variable.', formula=self.expr_str)
+
+        # copy the present values to the temporary expression
         self._push()
-        symbol = sp.Symbol(self.target)
+        self.consistency_check(silent_failure=True)
+
+        # solve the temporary expression for the set target
         solutions = sp.solve(self._tempex, self.target)
-        data = list()
+
+        # filer the solutions according to specified criteria (specified in parameters)
+        # sorting is done by dropping every irrelevant solution, not keeping the relevant ones
+        retained_solutions = list()
 
         for solution in solutions:
             if drop_negatives and solution < 0:
                 continue
-            elif drop_complex and solution.has(sp.I):
+            elif drop_complex and solution.has(I):
                 continue
-            elif not return_all and not isinstance(solution, (sp.Float, sp.Integer)):
+            elif num_only and not isinstance(solution, (sp.Float, sp.Integer)):
                 continue
             else:
                 if isinstance(solution, (sp.Float, sp.Integer)):
                     magn = float(solution)
-
                     if rounding:
                         magn = round(magn, self._rounding)
 
-                    d = Datum(self.target, magn, self._units[symbol])
-                    d.to(self._units[symbol], in_place=True)
-                    data.append(d)
-                    self.write(d)
+                    d = Datum(self.target, magn, self._units[self.target])
+
+                    if write_target:
+                        self.write(d)
+
+                    d.ito(self.units[self.target])
+                    retained_solutions.append(d)
                 else:
-                    data.append(solution)
+                    retained_solutions.append(solution)
 
-        if not data and not ignore_failures:
-            raise SolutionNotFound(comment='Could not find any solutions.', formula=self.expr)
+        # if no solutions were left/found, and we do not ignore failures, set FAIL flag to True, otherwise False
+        if not retained_solutions and not ignore_failures:
+            FAIL = True
+        else:
+            FAIL = False
 
-        self._tempex = self._expression
-        self._target = None
-        self._rounding = None
-        self._units[symbol] = None
+        # reset of the system (independently of whether we succeeded in solving the equation)
+        self._tempex = self.expr
 
-        return data
+        if reset_target:
+            self._rounding = None
+            self._target = None
+
+        # if  we failed, reset also target units and raise an exception
+        if FAIL:
+            if reset_target:
+                self._units[self.target] = None
+            raise SolutionNotFound(comment='Could not find any solutions.', formula=self.expr_str)
+        else:
+            if not retained_solutions:
+                self._units[self.target] = None
+            return retained_solutions
 
     @property
     def has_values(self) -> bool:
-        for n in self._values.values():
-            if n is not None:
-                return True
-        else:
-            return False
+        return None not in self._values.values()
 
     @property
     def solvable(self) -> bool:
-        num_unknowns = 0
-
-        for n in self._values.values():
-            if n is None:
-                num_unknowns += 1
-
-        return num_unknowns == 1
+        # number of unknowns is number of None's in the value dict
+        return len([k for k in self.symbols if not self.has_value(k)]) == 1
 
     @property
     def unknown(self) -> str:
         if self.solvable:
-            for v, n in self._values.items():
-                if n is None:
-                    return str(v)
+            for s in self.symbols:
+                if not self.has_value(s):
+                    return str(s)
+            else:
+                # if everything does well, this code should never be reached due to self.solvable condition
+                raise EquationNotSolvable(comment='Equation must be solvable to use this method ("Formula.unknown()").', formula=self.expr_str)
         else:
-            raise EquationNotSolvable(comment='Equation must be solvable to use this method ("Formula.unknown()").', formula=self.expr)
+            raise EquationNotSolvable(comment='Equation must be solvable to use this method ("Formula.unknown()").', formula=self.expr_str)
 
 
     @property
     def symbols(self) -> Tuple[str, ...]:
         symbols = tuple(self._symbols)
-        new_symbols = list()
-
-        for s in symbols:
-            new_symbols.append( str(s) )
-
-        return tuple(new_symbols)
+        return tuple([str(s) for s in symbols])
 
     @property
-    def values(self) -> Dict[str, float|int]:
-        new_dict = dict()
-
-        for s, v in self._values.items():
-            new_dict.update({ str(s) : v })
-
-        return new_dict
+    def values(self) -> Dict[str, Optional[float|int]]:
+        return dict([(str(s), v) for s, v in self._values.items()])
 
     @property
-    def units(self) -> Dict[str, str]:
-        new_dict = dict()
-
-        for s, v in self._units.items():
-            new_dict.update({str(s): v})
-
-        return new_dict
+    def units_str(self) -> Dict[str, str]:
+        return dict([(s, str(v)) for s, v in self._units.items()])
 
     @property
-    def expr(self) -> str:
+    def units(self) -> Dict[str, Datum.ureg.Unit]:
+        return self._units
+
+    @property
+    def expr_str(self) -> str:
         return str(self._expression)
+
+    @property
+    def expr(self) -> Expr:
+        return self._expression.copy()
 
     @property
     def target(self) -> str:
         return self._target
 
     @target.setter
-    def target(self, value: 'Datum') -> None:
-        self._target = value.symbol
-        self._rounding = value.num_decimals
-        self._return_units = value.unit
-        self._units[sp.Symbol(self._target)] = value.to_base_units().unit
+    def target(self, datum: Datum|str) -> None:
+        if isinstance(datum, str):
+            datum = Datum.from_string(datum)
+
+        self._target = datum.symbol
+        self._rounding = datum.num_decimals
+        self._return_units = datum.units
+        self._units[self._target] = datum.to_base_units().units
 
 
-"""
-f = Formula(expr='n - mps/M')
-f.write(Datum('mps', 5, 'g'))
-f.write(Datum('M', 18, 'g/mole'))
-f.target = Datum('n', 0.001, 'mole')
+if __name__ == '__main__':
+    values = [10, 20, 30, 40, 50, 60, 70, 80, 90]
 
-comment(*f.eval())
-
-comment(f.values)
-comment(f.decimals())
-comment(f.min_decimals())
-
-comment(f.consistency_check())
-"""
+    f = Formula(expr='n - mps/M')
+    f.target = 'n = 0.001 mole'
+    f.write('M = 18 g/mole')
+    print(f.values)

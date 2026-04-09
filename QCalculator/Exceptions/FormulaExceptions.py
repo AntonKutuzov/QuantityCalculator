@@ -8,7 +8,7 @@ class FormulaException(QCException):
 
 class InvalidZeroToleranceExponent(FormulaException):
     def __init__(self, comment: str, value: int):
-        self._message = f'The zero tolerance exponent must be between 0 and 100. Got: {value}.'
+        self._message = f'The zero tolerance exponent must be an integer between 0 and 100. Got: {value}.'
         super().__init__(self._message, comment)
 
 

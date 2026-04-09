@@ -1,5 +1,5 @@
 class QCException(BaseException):
-    def __init__(self, message:str, comment: str):
+    def __init__(self, message: str, comment: str):
         self._message = message
         self._comment = comment
 
