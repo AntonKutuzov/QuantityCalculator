@@ -111,6 +111,10 @@ class Datum:
                 raise InvalidSymbol('To indicate powers use e-notation (a*10e+b) instead of "**".', '*')
 
             number = float(number)
+
+            if units == '':
+                units = 'dimensionless'
+
             units = Datum.domesticate_units(units)
         except ValueError:
             raise InitialisationError(f'Invalid Datum definition string. Check the format: <symbol> = <value> <units> (including spaces).', string)
@@ -241,7 +245,9 @@ class Datum:
             q.ito_reduced_units()
             return self._create_datum_ip(q, new_datum_symbol)
 
-        elif isinstance(other, float|int):
+        elif isinstance(other, (float, int)):
+            if new_datum_symbol is not None:
+                raise InvalidSymbol(var=new_datum_symbol, comment='Division by an integer or float cannot change the symbol of Datum.')
             return self.scale(1/other)
 
         else:
@@ -256,7 +262,10 @@ class Datum:
             return other.div(self, new_datum_symbol)
 
         elif isinstance(other, (int, float, Quantity)):
-            return other / self.quantity
+            if new_datum_symbol is not None:
+                return Datum(new_datum_symbol, other / self.quantity)
+            else:
+                return other / self.quantity
 
         else:
             raise TypeError(f'Invalid type for division with Datum: "{type(other)}".')
@@ -273,6 +282,8 @@ class Datum:
             return self._create_datum_ip(q, new_datum_symbol)
 
         elif isinstance(other, (int, float)):
+            if new_datum_symbol is not None:
+                raise InvalidSymbol(var=new_datum_symbol, comment='Multiplication by an integer or float cannot change the symbol of Datum.')
             return self.scale(other)
 
         else:
@@ -304,7 +315,11 @@ class Datum:
             use_units_of: Literal['self', 'other'] = 'self',
             use_symbol_of: Literal['self', 'other'] = 'self',
             ) -> Datum:
-        return self.add(other.scale(-1), symbol_ex, use_units_of, use_symbol_of)
+
+        if isinstance(other, (Datum, Quantity)):
+            return self.add(-1*other, symbol_ex, use_units_of, use_symbol_of)
+        else:
+            raise TypeError(f'Expected "Datum" or "pint.Quantity", got "{type(other)}".')
 
     def rsub(self,
              other: Datum | Quantity,
@@ -328,11 +343,11 @@ class Datum:
                 return d
 
             except DimensionalityError:
-                raise IncompatibleUnits(comment=f'Cannot sum/subtract incompatible units', from_unit=self.units_str,
+                raise IncompatibleUnits(comment=f'Cannot subtract incompatible units', from_unit=self.units_str,
                                         to_unit=other.units)
 
         else:
-            raise IncompatibleUnits(comment=f'Cannot sum/subtract incompatible units', from_unit=self.units_str,
+            raise IncompatibleUnits(comment=f'Cannot subtract incompatible units', from_unit=self.units_str,
                                     to_unit=other.units)
 
 
@@ -445,13 +460,35 @@ class Datum:
 
 
     @staticmethod
-    def get_decimals(value: float) -> int:
-        """Returns a number of decimal places in the provided float number. Works only if the number is not a zero."""
+    def get_decimals(value: float|int|str) -> int:
+        """
+        Returns a number of decimal places in the provided float number. Works only if the number is not a zero.
+        For example, returns 3 for 0.001 and 1 for 0.1. Also returns 0 for integers.
+        """
 
-        if value == 0.0:
+        if not isinstance(value, bool) and value == 0.0:
+              # this isinstance command is added due to genius property of Python to treat boolean objects as integers.
+              # to avoid having "InvalidSymbol" error when (accidentally) passing a False to that function
+              # the isinstance check is added. The error is then TypeError, which is the correct one.
+              # To see how that works, just remove that check and run the tests for _get_decimals (see test_Datum.py).
             raise InvalidSymbol('Cannot determine significant digits. Choose a non-zero value.', str(value))
 
-        str_value = str(float(value))
+        if isinstance(value, float):
+            str_value = str(float(value))  # to quickly check for e-notation instead of 10**2 or 10^2
+            if int(value) == value:  # i.e. if it is an integer or a whole number, e.g. 2.0 or 10.0
+                return 0
+
+        elif isinstance(value, str):
+            str_value = str(float(value))
+            if '.' not in value:
+                return 0  # because we then expect it to be an integer
+                          # placed after convertion to float to check that the string is truly a number, not a random 'huh'
+
+        elif not isinstance(value, bool) and isinstance(value, int):
+            return 0
+
+        else:
+            raise TypeError(f'Expected "float" or "str", got "{type(value)}".')
 
         if 'e' in str_value:
             decimals = str_value.split('e')[1][1:] # to account for both e+ and e-

@@ -23,6 +23,9 @@ class Formula:
         self._rounding: Optional[int] = None
         self._return_units: Optional[Datum.ureg.Unit] = None
 
+        if '=' in expr:
+            raise Exception('The equation must not contain the "=" sign. Rewrite the equation as "everything = 0". use the minus signs.')
+
         self._expression = parse_expr(expr)
         self._tempex = parse_expr(expr)
         self._symbols = self.expr.free_symbols
@@ -118,6 +121,13 @@ class Formula:
                   d: Datum | str,
                   rewrite: bool = False
               ) -> None:
+        """
+        Saves the given Datum value to the Formula's "memory".
+
+        :param d: Datum or string suitable for Datum.to_datum
+        :param rewrite: if True Datums with the same symbol will not raise an exception
+        :return: None
+        """
 
         datum = Datum.to_datum(d)
         symbol = datum.symbol
