@@ -105,6 +105,7 @@ class Datum:
             symbol, rest = string.split('=')
             symbol = symbol.strip(' ')
             rest = rest.strip(' ')
+            rest += ' '
             number, units = rest.split(' ', maxsplit=1)
 
             if '*' in number:
