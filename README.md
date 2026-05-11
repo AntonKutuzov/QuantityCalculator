@@ -9,7 +9,7 @@
 
 # Features
 - Iteratively solves a system of linear equations
-- Has a custom class for keeping variable's symbol, value and units in one instance
+- Has a custom class for keeping variable's symbol, magnitude and units in one instance
 - Allows to search for a specific target through the system of equations, and stop when the target is found
 - Uses both sympy and pint packages to solve the equations, taking care of units
 
@@ -23,7 +23,7 @@ The package's main part is LinearIterator class which takes in the values for al
 ## Structure
 The package consists of three main classes: Datum, Formula and LinearIterator. The three classes form three layers at which we can present the data.
 
-Datum class stores and allows to modify individual variables. An instance of it is created by specifying three important quantities: variable's symbol (such as "m" for mass, "v" for velocity, etc.), value in a form of integer or float, and the units in a form of a string. The class then allows to convert the quantity into different units (using pint inside the class). It also supports multiple arithmetic operations with other Datum instances, pint quantities and native Python integers or floats.
+Datum class stores and allows to modify individual variables. An instance of it is created by specifying three important quantities: variable's symbol (such as "m" for mass, "v" for velocity, etc.), magnitude in a form of integer or float, and the units in a form of a string. The class then allows to convert the quantity into different units (using pint inside the class). It also supports multiple arithmetic operations with other Datum instances, pint quantities and native Python integers or floats.
 
 Formula class joins several Datum instances into one formula, such as F=ma, S=vt, or pV=nRT. Each variable in a formula is linked to an individual Datum class. The Formula class makes it possible to evaluate the missing variable if all the others are given, and detect whether an equation of this formula is solvable (=if one variable is missing).
 
@@ -36,7 +36,7 @@ Since both Formula and linearIterator store multiple instances of lower-level cl
 # Applications
 The Quantity Calculator package can be used to solve any kind of linear system with more than one iteration (otherwise, sympy is simpler and more powerful to use).
 
-The author of the code used this package in a larger project called [miniChemistry](https://github.com/AntonKutuzov/miniChemistry2). The code is used there to iteratively solve the typical equations for chemistry (such as C=Vn, n=m/M, etc.) and thus obtain the value of n (number of moles) which is crucial in all stoichiometric calculations in chemistry.
+The author of the code used this package in a larger project called [miniChemistry](https://github.com/AntonKutuzov/miniChemistry2). The code is used there to iteratively solve the typical equations for chemistry (such as C=Vn, n=m/M, etc.) and thus obtain the magnitude of n (number of moles) which is crucial in all stoichiometric calculations in chemistry.
 
 # Principle of work (Example)
 The code below gives an idea of how this module is used in the miniChemistry project to derive the number of moles (n) from any other variable without manually solving multiple equations.
@@ -105,7 +105,7 @@ li.write(M)
 
 # SELECTING THE TARGET
 """The target is indicated as a Datum instance, ASSIGNED to a .target property of a LinearInterator instance.
-The symbol, value and units of the Datum instance specify respectively the target variable, the number of significant
+The symbol, magnitude and units of the Datum instance specify respectively the target variable, the number of significant
 digits that the result will be rounded to (is needed), and the units in which you want to get the answer."""
 li.target = Datum('w', 0.01, 'percent')
 

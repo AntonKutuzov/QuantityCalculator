@@ -56,8 +56,8 @@ class LinearIterator:
 
     # ========================================================================================================= checkers
     def _select_data(self,
-                         criteria: Literal['symbol', 'value', 'units'],
-                         value: str|int|float|Datum.ureg.Unit,
+                         criteria: Literal['symbol', 'magnitude', 'units'],
+                         magnitude: str|int|float|Datum.ureg.Unit,
                          data_list: Optional[List[Datum]] = None
                      ) -> List[Datum]:
         """Allows to sort a list of Datum objects by the three attributes of Datum instances. self._data used by default"""
@@ -68,8 +68,8 @@ class LinearIterator:
         if criteria == 'symbol' and isinstance(value, str):
             res = filter(lambda d: d.symbol == value, data_list)
 
-        elif criteria == 'value' and isinstance(value, (int, float)):
-            res = filter(lambda d: d.value == value, data_list)
+        elif criteria == 'magnitude' and isinstance(value, (int, float)):
+            res = filter(lambda d: d.magnitude == value, data_list)
 
         elif criteria == 'units' and isinstance(value, (str, Datum.ureg.Unit)):
             v = Datum.domesticate_units(value)
@@ -123,7 +123,7 @@ class LinearIterator:
             zte = self._ZERO_TOLERANCE_EXPONENT
 
         if isinstance(d, (Datum, str)):
-            # Just check if there is a value written with that symbol. If yes, the values must be the same.
+            # Just check if there is a magnitude written with that symbol. If yes, the values must be the same.
             datum = Datum.to_datum(d)
             symbol, value = datum.symbol, datum.value
 
@@ -205,7 +205,7 @@ class LinearIterator:
         given in *data is left.
 
         :param data: Datum or string to be written into the linear iterator
-        :param rewrite: if True, allows to write for variables where a value is already stored
+        :param rewrite: if True, allows to write for variables where a magnitude is already stored
         :return:
         """
 
@@ -230,7 +230,7 @@ class LinearIterator:
                         i = self._data.index(dtm)
                         self._data.pop(i)
                 else:
-                    raise Exception(f'Cannot rewrite variable "{datum.symbol}". Current value(s): {", ".join([d.__str__() for d in datums])}')
+                    raise Exception(f'Cannot rewrite variable "{datum.symbol}". Current magnitude(s): {", ".join([d.__str__() for d in datums])}')
 
             rtw_data.append(datum)
             self._data.append(datum)
@@ -250,7 +250,7 @@ class LinearIterator:
         :param var: symbol of the variable to be read
         :param units: units in which the variable should be expressed. If None, the units provided when writing the variable will be used
         :param rounding: if True, the variable will be rounded to the *round_to* number of digits
-        :param round_to: the number of digits to which the value of the datum is rounded. Only if rounding=True
+        :param round_to: the number of digits to which the magnitude of the datum is rounded. Only if rounding=True
         :return:
         """
 
@@ -268,9 +268,9 @@ class LinearIterator:
             d = self._select_data('symbol', v)
 
             if len(d) == 0:
-                raise Exception(f'The variable "{v}" has no value.')
+                raise Exception(f'The variable "{v}" has no magnitude.')
             elif len(d) > 1:
-                raise Exception(f'The internal set of data is not consistent. More than one value is found for variable "{v}".')
+                raise Exception(f'The internal set of data is not consistent. More than one magnitude is found for variable "{v}".')
             else:  # if len(d) == 1
                 datum = copy(d[0])  # again, not to change the original Datum object (keep it expressed in base units)
 
