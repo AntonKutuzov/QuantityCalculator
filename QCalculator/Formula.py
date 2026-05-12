@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+from sympy.logic.boolalg import BooleanTrue
+
 from QCalculator.Exceptions.FormulaExceptions import (
-    RewritingError, InvalidUnitError, OverlappingVariables, InvalidSymbol,
+    RewritingError, InvalidUnitError, OverlappingVariables, InvalidSymbol, WrongUnitEquation,
     ConsistencyError, EquationNotSolvable, FailedConsistencyCheck,
     SymbolNotFound, NoValueError, TargetNotFound, UnknownNotFound
 )
 from QCalculator import Datum
 
 from typing import Dict, Optional, List, overload, Set, Iterable
-from pint import Unit
+from pint import Unit, Quantity
 from sympy import parse_expr, Eq, solve, Float, simplify, im, re, Symbol
 from copy import deepcopy, copy
 
@@ -63,7 +65,7 @@ class Formula:
         return f'{self.eq.lhs} = {self.eq.rhs}'
 
     @staticmethod
-    def _as_sympy_eq(expr: str) -> Eq:
+    def _as_sympy_eq(expr: str, _evaluate: bool = False) -> Eq:
         """
         Prases an expression from the user to a sympy Equality
 
@@ -80,29 +82,36 @@ class Formula:
             except TypeError:
                 raise InvalidSymbol(expr=expr)
 
-            eq = Eq(lhs, rhs)
+            eq = Eq(lhs, rhs, evaluate=_evaluate)
         else:
             try:
                 expr = parse_expr(expr)
             except TypeError:
                 raise InvalidSymbol(expr=expr)
 
-            eq = Eq(expr, 0)
+            eq = Eq(expr, 0, evaluate=_evaluate)
         return eq
 
-    def _complete_ref_units(self, ru: Dict[str, str|Unit]) -> Dict[str, Optional[str|Unit]]:
+    def _complete_ref_units(self, ru: Dict[str, str|Unit]) -> Dict[str, Optional[str]]:
         """
-        Adds None to variables for which use did not specify values.
+        Adds None to variables for which user did not specify values.
 
         :param ru:
         :return:
         """
 
-        unit_dict: Dict[str, Optional[str|Unit]] = ru.copy()
+        unit_dict: Dict[str, Optional[str]] = dict()
+
+        for v, u in ru.copy().items():  # in case we pass a dict for many Formulas at once (see LinearIterator)
+            if v in self.symbols:
+                unit_dict.update({v : u})
 
         for s in self.symbols:
             if s not in unit_dict.keys():
                 unit_dict.update({s : None})
+
+        if None not in unit_dict:
+            self._check_unit_equality(unit_dict)
 
         return unit_dict
 
@@ -148,6 +157,27 @@ class Formula:
 
         else:
             return True
+
+    def _check_unit_equality(self, units: Dict[str, str]) -> None:
+        # because the Eq evaluates these numerically, and x/x is 1, not "dimensionless" as a Symbol
+        units_updated = dict()
+
+        for v, u in units.items():
+            if u == '':
+                u = 1
+            else:
+                q: Quantity = 1 * Datum.normalize_units(u)
+                q.ito_base_units()
+                u = str(q.units)
+
+            units_updated.update({v : u})
+
+        # units_updates = dict([(v, (1 if u == '' else u)) for v, u in units.items()])
+
+        ueq = self.eq.subs(units_updated)
+
+        if not isinstance(ueq, BooleanTrue):
+            raise WrongUnitEquation(f=self.eq_str, units=units)
 
     def _value_dict(self) -> Dict[str, float|int]:
         """
@@ -287,15 +317,18 @@ class Formula:
         :return: True if the formula is consistent, False if not. True if there are not enough values to run the test
         and "silent_failure" is set to True
         """
+        from math import isclose
 
         if all([self.has_value(v) for v in self.symbols]):
             vd = self._value_dict()
-            eq = bool(self.eq.subs(vd))
 
-            if not eq and raise_exception:
+            lhs = self.eq.lhs.subs(vd)
+            rhs = self.eq.rhs.subs(vd)
+
+            if not isclose(rhs, lhs) and raise_exception:
                 raise ConsistencyError(formula=self.eq_str)
             else:
-                return eq
+                return isclose(rhs, lhs)
 
         elif silent_failure:
             return True
@@ -404,7 +437,7 @@ class Formula:
             res = list()
             for s in sols:
                 t = Symbol(self.target.symbol)
-                eq = Eq(t, s)
+                eq = Eq(t, s, evaluate=False)
                 res.append(eq)
             sols = res
         else:
@@ -445,6 +478,8 @@ class Formula:
         unk = self.unknown  # checks whether all variables have a value, and if they do, raises UnknownNotFound
 
         if self.target is None:
+            if self._ref_units is None:
+                raise Exception('Specify either target or reference units to solve equations without specifying target variable.')
             value = round(0.111111111111111, round_to)
             self.target = Datum(unk, value, self._ref_units[unk])
 
@@ -499,6 +534,11 @@ class Formula:
         values = self.has_value(list(self.symbols))
         nones = [v for v in values if v is False]  # count Falses. If there's one value missing, the equation can be solved
         return len(nones) <= 1
+
+    @property
+    def all_values(self) -> bool:
+        """returns True if all values are already present in the Formula"""
+        return len(self._data) == len(self.symbols)  # because we control for each var having no more than one value
 
     @property
     def unknown(self) -> str:

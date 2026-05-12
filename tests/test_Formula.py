@@ -9,7 +9,8 @@ from QCalculator.Exceptions.FormulaExceptions import (
     OverlappingVariables,
     TargetNotFound,
     UnknownNotFound,
-    EquationNotSolvable
+    EquationNotSolvable,
+    WrongUnitEquation
 )
 
 import pytest
@@ -70,11 +71,21 @@ def exception_handling(exception):
     )
 
 # ========================================================================================================= INITIALIZING
-def test_init_Formula(f1):
-    assert f1.eq_str == 'df = C1/C2'
-    assert f1._ref_units == {'df':'', 'C1':'mole/L', 'C2':'mole/L'}
-    assert f1.symbols == {'df', 'C1', 'C2'}
-    assert f1.data == set()
+# test for correct exception when incompatible units are given!
+@pytest.mark.parametrize(
+    "formula, equation, ref_units, symbols, exception",
+    [
+        pytest.param('df = C1/C2', 'df = C1/C2', {'df':'', 'C1':'M', 'C2':'M'}, {'df', 'C1', 'C2'}, None, id='init-with-eq'),
+        pytest.param('df - C1/C2', '-C1/C2 + df = 0', {'df':'', 'C1':'M', 'C2':'M'}, {'df', 'C1', 'C2'}, None, id='init-with-minus'),
+        pytest.param('df - C1/C2', '-C1/C2 + df = 0', {'df':'L', 'C1':'M', 'C2':'M'}, {'df', 'C1', 'C2'}, WrongUnitEquation, id='WrongUnitEquation')
+    ]
+)
+def test_init_Formula(formula, equation, ref_units, symbols, exception):
+    with exception_handling(exception):
+        f = Formula(formula, ref_units=ref_units)
+        assert f.eq_str == equation
+        assert f._ref_units == ref_units
+        assert f.symbols == symbols
 
 
 

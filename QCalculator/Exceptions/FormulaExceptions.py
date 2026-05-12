@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from QCalculator.Exceptions import QCException
 from QCalculator.Datum import Datum
@@ -31,6 +31,11 @@ class RewritingError(ReadWriteError):
 class InvalidUnitError(ReadWriteError):
     def __init__(self, var: str, units: str, ref: str, details: Optional[str] = None):
         message = f'The units "{units}" for variable "{var}" are not compatible with the reference units "{ref}".'
+        super().__init__(message, details)
+
+class WrongUnitEquation(ReadWriteError):
+    def __init__(self, f: str, units: Dict[str, str], details: Optional[str] = None):
+        message = f'Current units ({units}) do not form an equality when substituted into an equation "{f}"'
         super().__init__(message, details)
 
 class OverlappingVariables(ReadWriteError):
