@@ -65,6 +65,7 @@ class FailedConsistencyCheck(SolutionError):
         message = f'Could not run the consistency check for the formula "{formula}".'
         super().__init__(message, details)
 
+
 # NotFoundErrors
 class SymbolNotFound(NotFoundError):
     def __init__(self, formula: str, symbol: str, details: Optional[str] = None):
@@ -84,4 +85,9 @@ class TargetNotFound(NotFoundError):
 class UnknownNotFound(NotFoundError):
     def __init__(self, formula: str, details: Optional[str] = None):
         message = f'Could not determine the unknown variable for the formula "{formula}".'
+        super().__init__(message, details)
+
+class NoneReferenceUnits(NotFoundError):
+    def __init__(self, formula: str, var: str, details: Optional[str] = None):
+        message = f'The reference units for variable "{var}" in formula "{formula}" are not found.'
         super().__init__(message, details)

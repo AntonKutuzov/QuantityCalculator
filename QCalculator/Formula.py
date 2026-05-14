@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from sympy.logic.boolalg import BooleanTrue
-
 from QCalculator.Exceptions.FormulaExceptions import (
     RewritingError, InvalidUnitError, OverlappingVariables, InvalidSymbol, WrongUnitEquation,
     ConsistencyError, EquationNotSolvable, FailedConsistencyCheck,
-    SymbolNotFound, NoValueError, TargetNotFound, UnknownNotFound
+    SymbolNotFound, NoValueError, TargetNotFound, UnknownNotFound, NoneReferenceUnits
 )
 from QCalculator import Datum
 
 from typing import Dict, Optional, List, overload, Set, Iterable
 from pint import Unit, Quantity
-from sympy import parse_expr, Eq, solve, Float, simplify, im, re, Symbol
+from sympy import parse_expr, Eq, solve, Float, simplify, im, Symbol
+from sympy.logic.boolalg import BooleanTrue
 from copy import deepcopy, copy
 
 
@@ -105,13 +104,14 @@ class Formula:
         for v, u in ru.copy().items():  # in case we pass a dict for many Formulas at once (see LinearIterator)
             if v in self.symbols:
                 unit_dict.update({v : u})
+            if u is None:
+                raise NoneReferenceUnits(formula=self.eq_str, var=v)
 
         for s in self.symbols:
             if s not in unit_dict.keys():
-                unit_dict.update({s : None})
+                raise NoneReferenceUnits(formula=self.eq_str, var=s)
 
-        if None not in unit_dict:
-            self._check_unit_equality(unit_dict)
+        self._check_unit_equality(unit_dict)
 
         return unit_dict
 
@@ -324,11 +324,12 @@ class Formula:
 
             lhs = self.eq.lhs.subs(vd)
             rhs = self.eq.rhs.subs(vd)
+            close = isclose(rhs, lhs)
 
-            if not isclose(rhs, lhs) and raise_exception:
+            if not close and raise_exception:
                 raise ConsistencyError(formula=self.eq_str)
             else:
-                return isclose(rhs, lhs)
+                return close
 
         elif silent_failure:
             return True
@@ -385,8 +386,9 @@ class Formula:
     ) -> List[Eq] | List[Float]:
         """
         Evaluates the expression by using sympy solve() function. If "symbolic" is set to True, the result is a list of
-        Equality instances with the target variable expression in terms of all the other variables. If "symbolic" is
-        False, the available values are substituted for variables and the resulting expression is returned.
+        Equality instances with the target variable expressed in terms of all the other variables. If "symbolic" is
+        False, the available values are substituted for variables and the resulting expression is returned. If all
+        variables have a value, sp.Float is returned.
 
         The "filters" parameters specify which solutions to keep and which to ignore. On a class level several pre-set
         filters are defined (such as REAL_ONLY, POSITIVES, ...). Each filter is passed to the standard Python's filter()
@@ -454,13 +456,13 @@ class Formula:
             round_to: int = 2
     ) -> List[Datum]:
         """
-        The solve() method wraps eval() method since often Formula is used to solve linear equations that yield real
+        The solve() method wraps eval() method since often Formula is used to solve equations that yield real
         value which are compatible with the Datum class (imaginary or complex numbers are not). solve() also does
         rounding of the result if "rounding" parameter is set to True. The function rounds to the number of significant
         digits specified in the Datum definition string of the target variable (specified via .target setter).
 
-        The solve() method can be used without specifying the target, because solve() is only solve the equations, not
-        evaluate them symbolically. That is, the .unknown property is used to automatically determine the target. In
+        The solve() method can be used without specifying the target, because solve() only solves the equations, not
+        evaluates them symbolically. That is, the .unknown property is used to automatically determine the target. In
         this case the "round_to" parameter is used to specify to what number of significant digits the final value
         must be rounded. "round_to" is ignored if "rounding" is set to False.
 
@@ -475,13 +477,18 @@ class Formula:
         :return: list of Datum instances
         """
 
+        NONE_TARGET: bool
+
         unk = self.unknown  # checks whether all variables have a value, and if they do, raises UnknownNotFound
 
         if self.target is None:
+            NONE_TARGET = True
             if self._ref_units is None:
                 raise Exception('Specify either target or reference units to solve equations without specifying target variable.')
             value = round(0.111111111111111, round_to)
             self.target = Datum(unk, value, self._ref_units[unk])
+        else:
+            NONE_TARGET = False
 
         # "sols" can only be a float number since we solve with "symbloic=False", we checked for equation being solvable
         # and we filter for real numbers.
@@ -501,6 +508,9 @@ class Formula:
                 d = Datum(self.target.symbol, mag, self.target.units)
 
             res.append(d)
+
+        if NONE_TARGET:
+            self._target = None
 
         return res
 

@@ -10,7 +10,8 @@ from QCalculator.Exceptions.FormulaExceptions import (
     TargetNotFound,
     UnknownNotFound,
     EquationNotSolvable,
-    WrongUnitEquation
+    WrongUnitEquation,
+    NoneReferenceUnits
 )
 
 import pytest
@@ -75,9 +76,46 @@ def exception_handling(exception):
 @pytest.mark.parametrize(
     "formula, equation, ref_units, symbols, exception",
     [
-        pytest.param('df = C1/C2', 'df = C1/C2', {'df':'', 'C1':'M', 'C2':'M'}, {'df', 'C1', 'C2'}, None, id='init-with-eq'),
-        pytest.param('df - C1/C2', '-C1/C2 + df = 0', {'df':'', 'C1':'M', 'C2':'M'}, {'df', 'C1', 'C2'}, None, id='init-with-minus'),
-        pytest.param('df - C1/C2', '-C1/C2 + df = 0', {'df':'L', 'C1':'M', 'C2':'M'}, {'df', 'C1', 'C2'}, WrongUnitEquation, id='WrongUnitEquation')
+        pytest.param(
+            'df = C1/C2',
+            'df = C1/C2',
+            {'df':'', 'C1':'M', 'C2':'M'},
+            {'df', 'C1', 'C2'},
+            None,
+            id='init-with-eq'
+        ),
+        pytest.param(
+            'df - C1/C2',
+            '-C1/C2 + df = 0',
+            {'df':'', 'C1':'M', 'C2':'M'},
+            {'df', 'C1', 'C2'},
+            None,
+            id='init-with-minus'
+        ),
+        pytest.param(
+            'df - C1/C2',
+            '-C1/C2 + df = 0',
+            {'df':'L', 'C1':'M', 'C2':'M'},
+            {'df', 'C1', 'C2'},
+            WrongUnitEquation,
+            id='WrongUnitEquation'
+        ),
+        pytest.param(
+            'df - C1/C2',
+            '-C1/C2 + df = 0',
+            {'df':None, 'C1':'M', 'C2':'M'},
+            {'df', 'C1', 'C2'},
+            NoneReferenceUnits,
+            id='init-with-None-units'
+        ),
+        pytest.param(
+            'df - C1/C2',
+            '-C1/C2 + df = 0',
+            None,
+            {'df', 'C1', 'C2'},
+            None,
+            id='init-without-units'
+        ),
     ]
 )
 def test_init_Formula(formula, equation, ref_units, symbols, exception):
@@ -412,6 +450,7 @@ def _assert_solve(f1, data, *, target, rounding, expected, exception=None, round
 )
 def test_basic_solve(f1, data, target, expected):
     _assert_solve(f1, data, target=target, expected=expected, rounding=False)
+    assert f1._target is target  # to check that if there was no target, it is not assigned by the function
 
 @pytest.mark.parametrize(
     "data, target, rounding, round_to, expected",
