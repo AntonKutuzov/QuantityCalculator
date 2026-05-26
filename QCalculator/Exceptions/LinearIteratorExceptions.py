@@ -1,41 +1,49 @@
 from QCalculator.Exceptions import QCException
+from QCalculator import Datum
+
+from typing import Optional
 
 
-class LinIterExceptions(QCException):
-    def __init__(self, message: str, comment: str):
-        super().__init__(message, comment)
+class LinIterException(QCException):
+    def __init__(self, message: str, details: Optional[str] = None):
+        super().__init__(message, details)
 
 
-class InvalidZeroToleranceExponent(LinIterExceptions):
-    def __init__(self, comment: str, value: int):
-        self._message = f'The zero tolerance exponent must be between 0 and 100. Got: {value}.'
-        super().__init__(self._message, comment)
 
-class InconsistentVariable(LinIterExceptions):
-    def __init__(self, comment: str, var: str, v1: int|float, v2: int|float):
-        self._message = f'The variable "{var}" has contradicting values: "{v1}" and "{v2}".'
-        super().__init__(self._message, comment)
+class ReadWriteError(LinIterException):
+    pass
+
+class NotFoundError(LinIterException):
+    pass
 
 
-class TargetNotFound(LinIterExceptions):
-    def __init__(self, comment: str):
-        self._message = f'Specify target variable for the linear iterator.'
-        super().__init__(self._message, comment)
 
+class NoValueError(NotFoundError):
+    def __init__(self, symbol: str, details: Optional[str] = None):
+        message = f'The variable "{symbol}" does not have a value.'
+        super().__init__(message, details)
 
-class SolutionNotFound(LinIterExceptions):
-    def __init__(self, comment: str):
-        self._message = f'Could not find the solution.'
-        super().__init__(self._message, comment)
+class FormulasNotIndicated(NotFoundError):
+    def __init__(self, details: Optional[str] = None):
+        message = 'Linear Iterator must have at least one formula.'
+        super().__init__(message, details)
 
+class UnreachableTarget(NotFoundError):
+    def __init__(self, target: str, details: Optional[str] = None):
+        message = f'The indicated target "{target}" was not possible to find.'
+        super().__init__(message, details)
 
-class CannotRewriteVariable(LinIterExceptions):
-    def __init__(self, comment: str, var: str, old_value: int|float, new_value: int|float):
-        self._message = f'Could not rewrite the variable "{var}" from {old_value} to {new_value}.'
-        super().__init__(self._message, comment)
+class UnusedSymbolError(ReadWriteError):
+    def __init__(self, symbol: str, details: Optional[str] = None):
+        message = f'The variable "{symbol}" is not used in any of the formulas.'
+        super().__init__(message, details)
 
+class IncompatibleUnitsError(ReadWriteError):
+    def __init__(self, var: str, units: str, ref: str, details: Optional[str] = None):
+        message = f'The units "{units}" for variable "{var}" are not compatible with the reference units "{ref}".'
+        super().__init__(message, details)
 
-class VariableNotFound(LinIterExceptions):
-    def __init__(self, comment: str, var: str):
-        self._message = f'Could not find a variable with symbol: "{var}".'
-        super().__init__(self._message, comment)
+class RewritingError(ReadWriteError):
+    def __init__(self, var: str, old: Datum, details: Optional[str] = None):
+        message = f'Cannot rewrite variable "{var}". Current magnitude: {old.magnitude} {old.units_str}.'
+        super().__init__(message, details)

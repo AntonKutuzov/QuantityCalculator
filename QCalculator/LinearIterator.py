@@ -1,245 +1,279 @@
-from QCalculator.database import UNIT_REGISTRY, FORMULA_LIST
-from QCalculator import SETTINGS
-from QCalculator.Datum import Datum
-from QCalculator.Commenting import comment
-from QCalculator.Exceptions.LinearIteratorExceptions import *
+from QCalculator import Formula, Datum
+from QCalculator.Exceptions.DatumExceptions import InvalidSymbol
+from QCalculator.Exceptions.LinearIteratorExceptions import (
+    NoValueError,
+    UnusedSymbolError,
+    IncompatibleUnitsError,
+    RewritingError,
+    FormulasNotIndicated,
+    UnreachableTarget
+)
 
-from typing import List, Dict, Tuple
-from copy import deepcopy
+from typing import List, Dict, Tuple, Optional, Set, overload
 from pint import Unit
+from copy import copy, deepcopy
 
 
 class LinearIterator:
-    def __init__(self):
-        self._templates = deepcopy(FORMULA_LIST)
-        self._temporary_equations = deepcopy(self._templates)
-        self._read_constants()
-
+    def __init__(self, formulas: List[str], ref_units: Optional[Dict[str, str]] = None) -> None:
+        self._formulas = self._normalize_formulas(formulas, ref_units)
+        self._ref_units = self._select_units() if ref_units is not None else None
+        self._data = set()
         self._target = None
 
-    def _all_symbols(self) -> List[str]:
-        names = list()
+    # ================================================================================================== PRIVATE HELPERS
+    def _select_units(self) -> Dict[str, Optional[str]]:
+        present_units = dict()
 
-        for f in self._templates:
-            for v in f.values.keys():
-                names.append(v)
+        for s in self.symbols:
+            for f in self.formulas:
+                if s not in present_units and s in f.symbols:
+                    u = f._ref_units[s]
+                    present_units[s] = u
 
-        return names
+        return present_units
 
-    def _read_constants(self) -> None:
-        pass
+    @staticmethod
+    def _normalize_formulas(f: List[str], u: Dict[str, str]) -> Set[Formula]:
+        fs = set()
 
-    def _zte_test(self, zte: int) -> bool:
-        if isinstance(zte, int) and 0 < zte < 20:
-            return True
+        if not f:
+            raise FormulasNotIndicated()
+
+        for old_f in f:
+            if isinstance(old_f, str):
+                new_f = Formula(old_f, ref_units=u)
+
+                fs.add(new_f)
+            else:
+                raise TypeError(f'Expected type "str", got "{type(f)}".')
+
+        return fs
+
+    def _confirm_symbol(self, var: str, raise_exception: bool = True) -> bool:
+        if Datum._symbol_forbidden(var):
+            raise InvalidSymbol(var=var, details='Cannot use spaces and empty strings to define Datum.')
+
+        for f in self.formulas:
+            if var in f.symbols:
+                return True
         else:
-            return False
+            if raise_exception:
+                raise UnusedSymbolError(symbol=var)
+            else:
+                return False
 
-    def _is_close(self, num1: float|int, num2: float|int) -> bool:
-        from math import isclose
-        ZERO_TOLERANCE_EXPONENT = SETTINGS['ZERO TOLERANCE EXPONENT']
+    def _confirm_units(self, var: str, u: str|Unit, raise_exception: bool = True) -> bool:
+        units = Datum.normalize_units(u)
 
-        if self._zte_test(ZERO_TOLERANCE_EXPONENT):
-            zte = eval(f'10e-{ZERO_TOLERANCE_EXPONENT}')
-        else:
-            raise InvalidZeroToleranceExponent(comment='', value=ZERO_TOLERANCE_EXPONENT)
+        if self._ref_units is not None:
+            res = units.is_compatible_with(self._ref_units[var])
 
-        return isclose(num1, num2, abs_tol=zte)
-
-    def _test_var_presence(self, var: str) -> bool:
-        return var in self._all_symbols()
-
-    def _consistency_check(self, var: str, value: float|int, raise_exception: bool = True) -> bool:
-        if self.has_value(var):
-            d = self.read(var, rounding=False)
-
-            if not self._is_close(d.value, value):
-                raise InconsistentVariable(comment=f'The values are {d.value} and {value}', var=var, v1=value, v2=d.value)
-        else:
-            return True
-
-    def _compute_all(self) -> List[Datum]:
-        interres = list()
-
-        for f in self._temporary_equations:
-            if f.solvable:
-                s = f.unknown
-                comment(f'\t\tSolving {f.expr} for {s}:', end=' ')
-                u = UNIT_REGISTRY[s]
-                f.target = Datum(s, 0.001, u)
-                res = f.eval(ignore_failures=True, rounding=False)
-
-                if len(res) > 1:
-                    comment(res)
-                    raise Exception('Something strange happens...')
-                elif len(res) == 1:
-                    comment(f'got {res[0]}')
-                    interres.append(res[0])
-                else:
-                    comment('no numerical result')
-                    continue
-
-        return interres
-
-    def _iterate(self) -> List[Datum]:
-        if self.target is None:
-            raise TargetNotFound(comment='Specify the target Datum for the linear iterator.')
-
-        while True:
-            comment('\tComputing, considering new data...')
-            res = self._compute_all()
-
-            comment('\tINTERMEDIATE: ', *res)
-
-            comment('\tWriting in new data...')
-            for d in res:
-                self._consistency_check(d.symbol, d.value)
-                self.write(d)
-
-            if res:
-                yield res
+            if raise_exception and not res:
+                raise IncompatibleUnitsError(var=var, units=units, ref=self._ref_units[var])
             else:
                 return res
-
-    def solve(self,
-                  stop_at_target: bool = True,
-                  alter_target: bool = True,
-                  rounding: bool = False
-              ) -> Datum:
-
-        for data in self._iterate():
-            comment('\tOVERALL:', *data)
-            comment('New iteration...')
-            if self.target.symbol in [d.symbol for d in data] and stop_at_target:
-                break
-
-        for f in self._temporary_equations:
-            f.consistency_check(raise_exception=True, silent_failure=True)
-
-        if self.has_value(self.target.symbol):
-            answer = self.read(
-                self.target.symbol,
-                rounding=rounding,
-                units=self.target.unit,
-                round_to=self.target.num_decimals
-            )
-            comment(answer)
-
-            if alter_target:
-                self.target = answer
-
-            return answer
         else:
-            raise SolutionNotFound(comment='')
+            return True
 
-    def write(self, datum: Datum) -> None:
-        d = datum.to_base_units()
-        if not Unit(d.unit).is_compatible_with(Unit(UNIT_REGISTRY[datum.symbol])):
-            raise Exception(f'Variable "{datum.symbol}" cannot have units "{datum.unit}".')
 
-        if self.has_value(datum.symbol):
-            old = self.values[datum.symbol]
-            new = datum.value
-            if not self._is_close(old, new):
-                comment(self.values)
-                raise CannotRewriteVariable(comment='', var=datum.symbol, old_value=old, new_value=datum.value)
+    # =================================================================================================== READ AND WRITE
+    def write(self,
+              *data: Datum|str,
+              rewrite: bool = False
+              ) -> None:
 
-        WROTE = False
+        for d in data:
+            if not isinstance(d, (Datum, str)):
+                raise TypeError(f'Expected "Datum" or "str", got: "{type(d)}".')
 
-        self.values.update( {datum.symbol : datum.value} )
-        for f in self._temporary_equations:
-            if datum.symbol in f.symbols:
-                WROTE = True
-                f.write(datum)
+            d = Datum.as_datum(d)
+            self._confirm_symbol(d.symbol)
+            self._confirm_units(d.symbol, d.units)
 
-        if not WROTE:
-            raise VariableNotFound(comment='', var=datum.symbol)
+            if self.has_value(d.symbol):
+                if rewrite:
+                    self.erase(d.symbol)
+                else:
+                    old_datum = self.read(d.symbol)
+                    raise RewritingError(var=d.symbol, old=old_datum)
+
+            self._data.add(d)
+
+            for f in self._formulas:
+                if d.symbol in f.symbols:
+                    f.write(d, rewrite=rewrite)
+
+    @overload
+    def read(self, var: str, units: Optional[str] = None) -> Datum:
+        ...
+
+    @overload
+    def read(self, var: List[str], units: Optional[List[str]] = None) -> List[Datum]:
+        ...
 
     def read(self,
-             var: str,
-             units: str = 'default',
-             rounding: bool = True,
-             round_to: int = 2
-             ) -> Datum:
+             var: str|List[str],
+             units: Optional[str | Unit | List[str|Unit]] = None
+             ) -> Datum | List[Datum]:
 
-        u = UNIT_REGISTRY[var]
-        v = self.values[var]
-        d = Datum(var, v, u)
+        if isinstance(var, str):
+            self._confirm_symbol(var)
 
-        if not units == 'default':
-             d.to(units, in_place=True)
-        if rounding:
-            v = round(d.value, round_to)
+            if self.has_value(var):
+                d = filter(lambda d: d.symbol == var, self.data)
+                d = copy(list(d)[0])  # normally, only one Datum with any symbol is allowed in self._data
+
+                if units is not None:
+                    self._confirm_units(var, units)
+                    d.ito(units)
+
+                return d
+            else:
+                raise NoValueError(symbol=var)
+
+        elif isinstance(var, list):
+            if units is None:
+                units = len(var)*[None]  # because in the next if- units must be a list
+
+            if len(var) == len(units):
+                res = list()
+                for v, u in zip(var, units):
+                    r = self.read(v, u)
+                    res.append(r)
+
+                return res
+            else:
+                raise ValueError('The lengths of the "var" and "units" lists must be the same.')
         else:
-            v = d.value
+            raise TypeError('The read() method accepts its parameters either as string or as lists of strings.')
 
-        return Datum(var, v, d.unit)
+    def erase(self, var: Optional[str] = None) -> None:
+        if var is not None:
+            if self.has_value(var):
+                d = self.read(var)  # variable is confirmed here
+                self._data.remove(d)
 
-    def erase(self, var: str) -> None:
-        for f in self._temporary_equations:
-            f.erase(var)
+                for f in self.formulas:
+                    if var in f.symbols and f.has_value(var):
+                        f.erase(var)
 
-    def clear(self) -> None:
-        self._temporary_equations = deepcopy(self._templates)
+            elif var in self.symbols:
+                raise NoValueError(symbol=var)
 
-    def has_value(self, name: str) -> bool:
-        names = list()
+            else:
+                raise UnusedSymbolError(symbol=var)
 
-        for f in self._temporary_equations:
-            for v, n in f.values.items():
-                if n is not None and v not in names:
-                    names.append(v)
+        else:
+            for s in self.symbols:
+                if self.has_value(s):
+                    self.erase(s)
 
-        return name in names
+
+    # ========================================================================================================= ANALYSIS
+    def has_value(self, var: str) -> bool:
+        self._confirm_symbol(var)
+        return len(list(filter(lambda d: d.symbol == var, self.data))) > 0
+
+    # ===================================================================================================== CALCULATIONS
+    def iter(self) -> Set[Datum]:
+        """
+        Takes all solvable equations in the LI and solves them **once**. Returns all the obtained
+        Datum instances.
+
+        :return: set of newly obtained Datum instances
+        """
+
+        res = set()
+        for f in self.solvables:
+            r = f.solve(rounding=False)
+            res = res.union(r)  # since each Datum in LI must have its own symbol, no overlaps are expected
+        return res
+
+    def solve(self) -> Optional[Datum]:
+        while self.solvables:
+            res = self.iter()
+
+            self.write(*res)
+
+            if self.target is None:  # if .target is None, it has to attribute .symbol => another if-statement
+                continue
+            elif self.has_value(self.target.symbol):
+                return self.read(self.target.symbol, self.target.units)
+            else:  # if no value
+                continue
+
+        if self.target is None:
+            return None
+        else:
+            raise UnreachableTarget(target=self.target.symbol)
+
+
+    # ======================================================================================================= PROPERTIES
+    @property
+    def solvables(self) -> Set[Formula]:
+        solvable_eqs = set()
+
+        for f in self.formulas:
+            if f.solvable and not f.all_values:
+                solvable_eqs.add(f)
+
+        return solvable_eqs
 
     @property
-    def formulas(self) -> List[str]:
-        formula_list = list()
+    def data(self) -> Set[Datum]:
+        return deepcopy(self._data)
 
-        for f in self._templates:
-            formula_list.append(f.expr)
+    @property
+    def symbols(self) -> Set[str]:
+        symbols = set()
 
-        return formula_list
+        for f in self.formulas:
+            for s in f.symbols:
+                symbols.add(s)
+
+        return symbols
+
+    @property
+    def formulas(self) -> Set[Formula]:
+        return deepcopy(self._formulas)
 
     @property
     def target(self) -> Datum:
         return self._target
 
     @target.setter
-    def target(self, value: Datum) -> None:
-        if self._test_var_presence(value.symbol):
-            self._target = value
+    def target(self, datum: Datum|str) -> None:
+        if isinstance(datum, (str, Datum)):
+            datum = Datum.as_datum(datum)
+            self._confirm_symbol(datum.symbol)
+            self._confirm_units(datum.symbol, datum.units)
+            self._target = datum
         else:
-            raise VariableNotFound(comment='', var=value.symbol)
+            raise TypeError(f'Expected "str" or "Datum", got "{type(datum)}".')
 
-    @property
-    def values(self) -> Dict[str, float|int]:
-        values = dict()
 
-        for f in self._temporary_equations:
-            for s, v in f.values.items():
-                if v is None:
-                    continue
-                elif values.get(s) is None:
-                    values.update( {s : v} )
-                else:
-                    old = values[s]
-                    new = v
 
-                    if self._is_close(old, new):
-                        continue
-                    else:
-                        comment(f.values)
-                        raise InconsistentVariable(comment='', var=s, v1=v, v2=old)
-        return values
+if __name__ == "__main__":
+    fs = ['n = mps/M', 'wmm = mps/msm', 'n = Np/NA']
+    us = {
+        'wmm':'',
+        'mps':'g',
+        'n':'mole',
+        'msm':'g',
+        'M':'g/mole',
+        'Np':'',
+        'NA':'mole**-1'
+    }
+    data = [
+        'wmm = 0.1',
+        'msm = 30 g',
+        'M = 18 g/mole',
+        'NA = 6.02e23 1/mole',
+        'Np = 1'
+    ]
 
-    @property
-    def quantities(self) -> Dict[str, Tuple[float, str]]:
-        # Don't use UnitRegistry, because you cannot operate on units of different ones
-        qs = dict()
-
-        for var, value in self.values.items():
-            u = UNIT_REGISTRY[var]
-            qs.update( {var : (float(value), u)} )
-
-        return qs
+    li = LinearIterator(fs, us)
+    li.target = 'mps = 0.01 g'
+    li.write(*data)
+    print(li.solve())
