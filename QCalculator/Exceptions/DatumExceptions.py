@@ -30,7 +30,7 @@ class IncompatibleUnits(DatumException):
 class InitializationError(DatumException):
     def __init__(self, args, *, details: Optional[str] = None) -> None:
         super().__init__(
-            f'Cannot initialise Datum instance from the provided set of positional arguments: {args}.',
+            f'Cannot initialise Datum instance from the provided set of positional arguments: "{args}".',
             details
         )
 

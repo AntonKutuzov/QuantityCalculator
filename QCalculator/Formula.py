@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+from numbers import Number
+
 from QCalculator.Exceptions.FormulaExceptions import (
-    RewritingError, InvalidUnitError, OverlappingVariables, InvalidSymbol, WrongUnitEquation,
+    RewritingError, IncompatibleUnitsError, OverlappingVariables, InvalidSymbol, WrongUnitEquation,
     ConsistencyError, EquationNotSolvable, FailedConsistencyCheck,
-    SymbolNotFound, NoValueError, TargetNotFound, UnknownNotFound, NoneReferenceUnits
+    SymbolNotFound, NoValueError, TargetNotFound, UnknownNotFound, NoneReferenceUnits, InvalidExpression
 )
 from QCalculator import Datum
 
 from typing import Dict, Optional, List, overload, Set, Iterable
-from pint import Unit, Quantity
+from pint import Unit
 from sympy import parse_expr, Eq, solve, Float, simplify, im, Symbol
-from sympy.logic.boolalg import BooleanTrue
 from copy import deepcopy, copy
 
 
@@ -63,6 +64,27 @@ class Formula:
     def __str__(self):
         return f'{self.eq.lhs} = {self.eq.rhs}'
 
+    def __eq__(self, other: Formula) -> bool:
+        """
+        Formulas are considered the same if\n
+        - they have the same expressions;
+        - their reference units (if specified) coincide;
+
+        If the reference units are not specified for at least one of the
+        equations, the second condition is automatically satisfied.
+        """
+
+        same_eq = (self.eq == other.eq)
+
+        same_units = True
+        if self._ref_units is not None and other._ref_units is not None:
+            same_units = (self._ref_units == other._ref_units)
+
+        return all([same_eq, same_units])
+
+    def __hash__(self) -> int:
+        return hash(self.eq_str)
+
     @staticmethod
     def _as_sympy_eq(expr: str, _evaluate: bool = False) -> Eq:
         """
@@ -83,12 +105,8 @@ class Formula:
 
             eq = Eq(lhs, rhs, evaluate=_evaluate)
         else:
-            try:
-                expr = parse_expr(expr)
-            except TypeError:
-                raise InvalidSymbol(expr=expr)
-
-            eq = Eq(expr, 0, evaluate=_evaluate)
+            raise InvalidExpression(expr=expr, details='An equation must contain an equality sign.')
+        
         return eq
 
     def _complete_ref_units(self, ru: Dict[str, str|Unit]) -> Dict[str, Optional[str]]:
@@ -102,6 +120,8 @@ class Formula:
         unit_dict: Dict[str, Optional[str]] = dict()
 
         for v, u in ru.copy().items():  # in case we pass a dict for many Formulas at once (see LinearIterator)
+            if u is not None:
+                Datum.normalize_units(u)  # to raise pint.UndefinedUnitError if arbitrary string is passed as a unit
             if v in self.symbols:
                 unit_dict.update({v : u})
             if u is None:
@@ -110,8 +130,6 @@ class Formula:
         for s in self.symbols:
             if s not in unit_dict.keys():
                 raise NoneReferenceUnits(formula=self.eq_str, var=s)
-
-        self._check_unit_equality(unit_dict)
 
         return unit_dict
 
@@ -151,33 +169,12 @@ class Formula:
             res = units.is_compatible_with(self._ref_units[symbol])
 
             if raise_exception and not res:
-                raise InvalidUnitError(var=symbol, units=units, ref=self._ref_units[symbol])
+                raise IncompatibleUnitsError(var=symbol, units=units, ref=self._ref_units[symbol])
             else:
                 return res
 
         else:
             return True
-
-    def _check_unit_equality(self, units: Dict[str, str]) -> None:
-        # because the Eq evaluates these numerically, and x/x is 1, not "dimensionless" as a Symbol
-        units_updated = dict()
-
-        for v, u in units.items():
-            if u == '':
-                u = 1
-            else:
-                q: Quantity = 1 * Datum.normalize_units(u)
-                q.ito_base_units()
-                u = str(q.units)
-
-            units_updated.update({v : u})
-
-        # units_updates = dict([(v, (1 if u == '' else u)) for v, u in units.items()])
-
-        ueq = self.eq.subs(units_updated)
-
-        if not isinstance(ueq, BooleanTrue):
-            raise WrongUnitEquation(f=self.eq_str, units=units)
 
     def _value_dict(self) -> Dict[str, float|int]:
         """
@@ -262,13 +259,13 @@ class Formula:
 
         if isinstance(var, str):
             self._confirm_symbol(var)
-            self._confirm_units(var, units)
 
             if self.has_value(var):
                 ds = filter(lambda a: a.symbol == var, self._data)
                 ds = copy(list(ds)[0])
 
                 if units is not None:
+                    self._confirm_units(var, units)
                     ds.ito(units)
 
                 return ds
@@ -310,6 +307,12 @@ class Formula:
         Checks that the formula is consistent with currently written values. The formula is consistent when substitution
         of the values give a true equality, i.e. LHS and RHS are equal.
 
+        **NOTE**: When an equation is written in the form 'a - b/c = 0' instead of 'a = b/c', AND both sides appear to
+        be large numbers (about 1e15+), the intolerance of float numbers obtained after computations may become too big
+        and result in False whereas the intended behaviour was True. To avoid it, try to define the equations in the form
+        of 'a = b/c' where both sides are not zero.
+
+
         :param silent_failure: when True, the function returns True if not all values are written. Otherwise,
         FailedConsistencyCheck is raised
         :param raise_exception: when True, and the formula is inconsistent, the ConsistencyError is raised instead of
@@ -317,6 +320,7 @@ class Formula:
         :return: True if the formula is consistent, False if not. True if there are not enough values to run the test
         and "silent_failure" is set to True
         """
+
         from math import isclose
 
         if all([self.has_value(v) for v in self.symbols]):
@@ -324,7 +328,10 @@ class Formula:
 
             lhs = self.eq.lhs.subs(vd)
             rhs = self.eq.rhs.subs(vd)
-            close = isclose(rhs, lhs)
+
+            close = isclose(rhs, lhs, rel_tol=1e-12, abs_tol=1e-15)
+            # 15 digits are the last digit not affected by operations with float in Python (abs_tol).
+            # one of the sides is always zero due to the standard way of writing equations in Formula.
 
             if not close and raise_exception:
                 raise ConsistencyError(formula=self.eq_str)
@@ -383,7 +390,7 @@ class Formula:
             self,
             *filters,
             symbolic: bool = False
-    ) -> List[Eq] | List[Float]:
+    ) -> Set[Eq] | Set[Float]:
         """
         Evaluates the expression by using sympy solve() function. If "symbolic" is set to True, the result is a list of
         Equality instances with the target variable expressed in terms of all the other variables. If "symbolic" is
@@ -407,7 +414,7 @@ class Formula:
             >>> f1.eval(Formula.POSITIVES)
             []
             >>> f1.eval(Formula.NEGATIVES)
-            [-3.00000000000000, -2.00000000000000]
+            [-3, -2]
 
 
         :param filters: function to be passed to the filter() Python function to sort solutions from sympy solve
@@ -427,26 +434,27 @@ class Formula:
         if not symbolic:
             if self.has_value(self.target.symbol):
                 tbu = self.read(self.target.symbol, self.target.base_units)
-                return [Float(tbu.magnitude)]
+                return {Float(tbu.magnitude)}
             else:
                 eq = self.eq.subs(vd)
         else:
             eq = self.eq
 
         sols = solve(eq, self.target.symbol)
+        native_sols = set([float(s) if isinstance(s, Number) else s for s in sols])
 
         if symbolic:
-            res = list()
-            for s in sols:
+            res = set()
+            for s in native_sols:
                 t = Symbol(self.target.symbol)
                 eq = Eq(t, s, evaluate=False)
-                res.append(eq)
-            sols = res
+                res.add(eq)
+            native_sols = res
         else:
             for fil in filters:
-                sols = list(filter(fil, sols))
+                native_sols = set(filter(fil, native_sols))
 
-        return sols
+        return native_sols
 
 
     def solve(
@@ -454,7 +462,7 @@ class Formula:
             *filters,
             rounding: bool = True,
             round_to: int = 2
-    ) -> List[Datum]:
+    ) -> Set[Datum]:
         """
         The solve() method wraps eval() method since often Formula is used to solve equations that yield real
         value which are compatible with the Datum class (imaginary or complex numbers are not). solve() also does
@@ -493,9 +501,9 @@ class Formula:
         # "sols" can only be a float number since we solve with "symbloic=False", we checked for equation being solvable
         # and we filter for real numbers.
         # NOTE: filters must be directly passed to the eval() method. The tests do not account for filters in solve().
-        sols: List[Float] = self.eval(Formula.REAL_ONLY, *filters)
+        sols: Set[Float] = self.eval(Formula.REAL_ONLY, *filters)
 
-        res = list()
+        res = set()
 
         for sol in sols:
             sol = float(sol)  # from smypy Float to Python's native float
@@ -507,7 +515,7 @@ class Formula:
                 mag = round(d.magnitude, Datum.get_decimals(self.target.magnitude))
                 d = Datum(self.target.symbol, mag, self.target.units)
 
-            res.append(d)
+            res.add(d)
 
         if NONE_TARGET:
             self._target = None

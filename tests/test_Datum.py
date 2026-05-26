@@ -6,8 +6,7 @@ from sympy import Symbol
 from QCalculator import Datum
 from QCalculator.Exceptions.DatumExceptions import (
     IncompatibleUnits,
-    InitializationError,
-    InvalidSymbol,
+    InitializationError
 )
 
 
@@ -61,7 +60,7 @@ def test_init_datum():
     }
     _test_datum(dat2, expect2)
 
-    with pytest.raises(InitializationError):
+    with pytest.raises(TypeError):
         Datum(1, 2, 3)
 
     with pytest.raises(pint.UndefinedUnitError):
@@ -69,6 +68,10 @@ def test_init_datum():
 
     with pytest.raises(InitializationError):
         Datum('N', 6.02*10**23, 'dimensionless')
+
+    with pytest.raises(InitializationError):
+        Datum('', 10, 'km')
+        Datum(' ', 10, 'km')
 
 
 
@@ -117,8 +120,11 @@ def test_from_string():
     with pytest.raises(InitializationError):
         Datum.from_string('N = 6.02e23')
 
-    with pytest.raises(InvalidSymbol):
+    with pytest.raises(InitializationError):
         Datum.from_string('m=10km')  # the space between '10' and 'km' is mandatory
+
+    with pytest.raises(InitializationError):
+        Datum.from_string('= 10 km')  # empty string or space cannot be used as symbol
 
 
 def test_to_datum():
@@ -192,9 +198,8 @@ def test_to_datum():
     with pytest.raises(InitializationError):
         Datum.as_datum(q)
 
-
 def test_str_(d1, d2):
-    assert d1.__str__() == 'l = 2 meter'
+    assert d1.__str__() == 'l = 2.0 meter'
     assert d2.__str__() == 't = 5.2 second'
 
 

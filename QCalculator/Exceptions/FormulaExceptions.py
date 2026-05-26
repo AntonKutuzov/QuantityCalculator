@@ -28,7 +28,7 @@ class RewritingError(ReadWriteError):
         message = f'Cannot rewrite variable "{var}". Current magnitude: {old.magnitude} {old.units_str}.'
         super().__init__(message, details)
 
-class InvalidUnitError(ReadWriteError):
+class IncompatibleUnitsError(ReadWriteError):
     def __init__(self, var: str, units: str, ref: str, details: Optional[str] = None):
         message = f'The units "{units}" for variable "{var}" are not compatible with the reference units "{ref}".'
         super().__init__(message, details)
@@ -46,6 +46,11 @@ class OverlappingVariables(ReadWriteError):
 class InvalidSymbol(ReadWriteError):
     def __init__(self, expr: str, details: Optional[str] = None):
         message = f'The expression "{expr}" contains a symbol that cannot be used in sympy expressions.'
+        super().__init__(message, details)
+
+class InvalidExpression(ReadWriteError):
+    def __init__(self, expr: str, details: Optional[str] = None):
+        message = f'The expression "{expr}" is invalid.'
         super().__init__(message, details)
 
 

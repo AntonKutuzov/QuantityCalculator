@@ -69,7 +69,10 @@ from QCalculator.Exceptions.DatumExceptions import InvalidSymbol, Initialization
 # class implementation
 class Datum:
     ureg = UnitRegistry(system='SI')
-    _FORBIDDEN_SYMBOLS: Tuple[str] = ('',)
+    _FORBIDDEN_SYMBOLS: Tuple[str] = ('', ' ')
+    ROUNDING: int = 15
+    # is needed to remove 1's after calculations in Formula. Removal is needed for hash function to work properly
+    # Do not set ROUNDING to more than 15. If equal Datums a said to be different, try setting it to 14 or 13.
 
     def __init__(self,
                  symbol: str,
@@ -77,7 +80,10 @@ class Datum:
                  units: str|Unit
                  ) -> None:
 
-        if Datum._sympy_symbol_check(symbol):
+        if not isinstance(symbol, str):
+            raise TypeError('Symbol for Datum must be given as a string.')
+
+        if Datum._sympy_symbol_check(symbol) and not Datum._symbol_forbidden(symbol):
             self._symbol: str = symbol
             self._magnitude: float = float(magnitude)
 
@@ -94,21 +100,24 @@ class Datum:
     @staticmethod
     def from_quantity(symbol: str, quantity: Quantity) -> Datum:
         sp_check = Datum._sympy_symbol_check(symbol)
-        fs_check = Datum._in_forbidden_symbols(symbol)
+        fs_check = not Datum._symbol_forbidden(symbol)
 
         if sp_check and fs_check:
             units = Datum.normalize_units(quantity.units)
             return Datum(symbol, quantity.magnitude, units)
+
         elif not sp_check:
             raise InitializationError(
                 symbol,
                 details='Cannot create Datum with this symbol, because it cannot be used in sympy expressions.'
             )
+
         elif not fs_check:
             raise InitializationError(
                 symbol,
                 details='Cannot create Datum with this symbol.'
             )
+
         else:
             raise Exception('This is not supposed to happen. There is a bug in the code.')
 
@@ -119,6 +128,10 @@ class Datum:
         try:
             symbol, rest = datum.split('=')
             symbol = symbol.strip(' ')
+
+            if Datum._symbol_forbidden(symbol):
+                raise InitializationError(symbol, details='This symbol cannot be used for instantiating Datum.')
+
             rest = rest.strip(' ')
             rest += ' '  # to make it possible to convert ' ' to 'dimensionless'
             number, units = rest.split(' ', maxsplit=1)
@@ -127,12 +140,12 @@ class Datum:
                 number = float(number)
             except ValueError as e:
                 if '*' or '^' in number:
-                    raise InvalidSymbol(var=number, details=''
+                    raise InitializationError(number, details=''
                                                             'To indicate powers use e-notation (ae+b or ae-b).'
                                                             ' Check that you have a space between the magnitude and the units of the Datum.'
                                                             '') from e
                 else:
-                    raise InvalidSymbol(var=number, details='Check that you have a space between number and units. "10km" is wrong, "10 km" is correct.') from e
+                    raise InitializationError(number, details='Check that you have a space between number and units. "10km" is wrong, "10 km" is correct.') from e
 
             units = Datum.normalize_units(units)
 
@@ -155,7 +168,10 @@ class Datum:
         requires passing in "symbol" parameter."""
 
         if isinstance(d, Datum):
-            return copy(d)  # so that changes of the returned object do not affect the original one and vice versa
+            newd = Datum(d.symbol, d.magnitude, d.units)
+            return newd
+            # so that changes of the returned object do not affect the original one and vice versa
+            # copy() is not used, because magnitude must be rounded initially.
         elif isinstance(d, Quantity):
             return Datum.from_quantity(symbol, d)
         elif isinstance(d, str):
@@ -196,8 +212,10 @@ class Datum:
         return all(conditions)
 
     def __hash__(self):
-        s = str(self).replace(' ', '')
-        return hash(s)
+        return hash(self.symbol)
+        # only symbol is used for hash() because
+        # (1) float numbers obtained from calculations have tolerance and thus are not perfectly equal -> different hash
+        # (2) same units expressed in different ways (used as strings of course) -> different strings -> different hash
 
     # arithmetics
     def div(self, other: Datum|Quantity) -> Quantity:
@@ -361,10 +379,10 @@ class Datum:
         return True
 
     @staticmethod
-    def _in_forbidden_symbols(symbol: str) -> bool:
-        """Returns True if the test is passed, i.e. no forbidden symbols found."""
+    def _symbol_forbidden(symbol: str) -> bool:
+        """Returns True if the symbol is forbidden, False otherwise."""
         s = symbol.strip(' ')
-        return s not in Datum._FORBIDDEN_SYMBOLS
+        return s in Datum._FORBIDDEN_SYMBOLS
 
     @staticmethod
     def _get_quantity(d: Datum|Quantity) -> Quantity:

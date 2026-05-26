@@ -2,7 +2,7 @@ from QCalculator import Formula, Datum
 from QCalculator.Exceptions.DatumExceptions import InitializationError
 from QCalculator.Exceptions.FormulaExceptions import (
     ConsistencyError,
-    InvalidUnitError,
+    IncompatibleUnitsError,
     SymbolNotFound,
     NoValueError,
     FailedConsistencyCheck,
@@ -10,9 +10,9 @@ from QCalculator.Exceptions.FormulaExceptions import (
     TargetNotFound,
     UnknownNotFound,
     EquationNotSolvable,
-    WrongUnitEquation,
-    NoneReferenceUnits
+    NoneReferenceUnits, InvalidExpression
 )
+import pint
 
 import pytest
 from sympy import Eq, Symbol
@@ -72,7 +72,6 @@ def exception_handling(exception):
     )
 
 # ========================================================================================================= INITIALIZING
-# test for correct exception when incompatible units are given!
 @pytest.mark.parametrize(
     "formula, equation, ref_units, symbols, exception",
     [
@@ -85,23 +84,7 @@ def exception_handling(exception):
             id='init-with-eq'
         ),
         pytest.param(
-            'df - C1/C2',
-            '-C1/C2 + df = 0',
-            {'df':'', 'C1':'M', 'C2':'M'},
-            {'df', 'C1', 'C2'},
-            None,
-            id='init-with-minus'
-        ),
-        pytest.param(
-            'df - C1/C2',
-            '-C1/C2 + df = 0',
-            {'df':'L', 'C1':'M', 'C2':'M'},
-            {'df', 'C1', 'C2'},
-            WrongUnitEquation,
-            id='WrongUnitEquation'
-        ),
-        pytest.param(
-            'df - C1/C2',
+            'df - C1/C2 = 0',
             '-C1/C2 + df = 0',
             {'df':None, 'C1':'M', 'C2':'M'},
             {'df', 'C1', 'C2'},
@@ -109,12 +92,28 @@ def exception_handling(exception):
             id='init-with-None-units'
         ),
         pytest.param(
-            'df - C1/C2',
+            'df - C1/C2 = 0',
             '-C1/C2 + df = 0',
             None,
             {'df', 'C1', 'C2'},
             None,
             id='init-without-units'
+        ),
+        pytest.param(
+            'df - C1/C2 = 0',
+            '-C1/C2 + df = 0',
+            {'df':'', 'C1':'hello', 'C2':'M'},
+            {'df', 'C1', 'C2'},
+            pint.UndefinedUnitError,
+            id='init-with-invalid-units'
+        ),
+        pytest.param(
+            'df - C1/C2',
+            '',
+            dict(),
+            dict(),
+            InvalidExpression,
+            id='no-equality-sign-expression'
         ),
     ]
 )
@@ -125,6 +124,50 @@ def test_init_Formula(formula, equation, ref_units, symbols, exception):
         assert f._ref_units == ref_units
         assert f.symbols == symbols
 
+# ======================================================================================================== MAGIC METHODS
+@pytest.mark.parametrize(
+    "check, result",
+    [
+        # "other" units mean that they are not the same, although still may be compatible
+        pytest.param(
+            Formula('df = C1/C2', ref_units={'df':'', 'C1':'mole/L', 'C2':'mole/L'}),
+            True,
+            id='normal-with-equal'
+        ),
+        pytest.param(
+            Formula('df = -C1/C2', ref_units={'df':'', 'C1':'mole/L', 'C2':'mole/L'}),
+            False,
+            id='other-formula-same-units'
+        ),
+        pytest.param(
+            Formula('df = C1/C2', ref_units={'df': '', 'C1': 'mmole/mL', 'C2': 'mmole/mL'}),
+            False,
+            id='same-formula-other-units'
+        ),
+        pytest.param(
+            Formula('df = -C1/C2', ref_units={'df': '', 'C1': 'mmole/mL', 'C2': 'mmole/mL'}),
+            False,
+            id='other-formula-other-units'
+        ),
+        pytest.param(
+            Formula('df = C1/C2', ref_units={'df': '', 'C1': 'mL', 'C2': 'mL'}),
+            False,
+            id='same-formula-incompatible-units'
+        ),
+        pytest.param(
+            Formula('df = C1/C2'),
+            True,
+            id='same-formula-no-units'
+        ),
+        pytest.param(
+            Formula('df = -C1/C2'),
+            False,
+            id='other-formula-no-units'
+        ),
+    ]
+)
+def test_formula_eq(f1, check, result):
+    assert (f1 == check) is result
 
 
 # ================================================================================================== WRITING AND READING
@@ -173,7 +216,7 @@ def test_write_consistency_check(f1, data, force_inc, exception, expected_data):
 @pytest.mark.parametrize(
     "data, exception, expected_data",
     [
-        pytest.param(['df = 2.5 L'],    InvalidUnitError,       {}, id='InvalidUnitError'),
+        pytest.param(['df = 2.5 L'], IncompatibleUnitsError, {}, id='InvalidUnitError'),
         pytest.param(['V0 = 22.4 L'],   SymbolNotFound,         {}, id='SymbolNotFound'),
         pytest.param([2],               TypeError,              {}, id='TypeError_int'),
         pytest.param([True],            TypeError,              {}, id='TypeError_bool'),
@@ -221,8 +264,8 @@ def test_read_with_units(f1, data, units, expected):
         pytest.param('V0',          None,                   SymbolNotFound,     None,   id='SymbolNotFound-other'),
         pytest.param('C2',          None,                   NoValueError,       None,   id='NoValueError-single'),
         pytest.param(['C1', 'C2'],  ['mmol/L', 'mmol/L'],   NoValueError,       None,   id='NoValueError-list'),
-        pytest.param('C1',          'kHz',                  InvalidUnitError,   None,   id='InvalidUnitError-single'),
-        pytest.param(['C1', 'df'],  [None, 'M'],            InvalidUnitError,   None,   id='InvalidUnitError-list')
+        pytest.param('C1',          'kHz', IncompatibleUnitsError, None, id='InvalidUnitError-single'),
+        pytest.param(['C1', 'df'], [None, 'M'], IncompatibleUnitsError, None, id='InvalidUnitError-list')
     ]
 )
 def test_read_exceptions(f1, data, units, exception, expected):
@@ -332,16 +375,16 @@ def _assert_eval(f, data, *, target, filters, symbolic, expected, exception=None
 @pytest.mark.parametrize(
     "fix, data, target, expected",
     [
-        pytest.param('f1', {PD.C1, PD.C2}, TS.df, [2.5], id='single-solution'),
+        pytest.param('f1', {PD.C1, PD.C2}, TS.df, {2.5}, id='single-solution'),
         pytest.param(
             'f2',
             {Datum('y', 0.0, '')},
             Datum('x', 0.01, ''),
-            [-3.00000000000000, -2.00000000000000],
+            {-3.00000000000000, -2.00000000000000},
             id='several-solutions'
         ),
-        pytest.param('f1', {PD.C1}, TS.df, [1200.0/Symbol('C2')], id='partial-solution'),
-        pytest.param('f1', {PD.df, PD.C1}, TS.df, [PD.df.magnitude], id='target-already-written')
+        pytest.param('f1', {PD.C1}, TS.df, {1200.0/Symbol('C2')}, id='partial-solution'),
+        pytest.param('f1', {PD.df, PD.C1}, TS.df, {PD.df.magnitude}, id='target-already-written')
     ]
 )
 def test_eval_numeric(f1, f2, fix, data, target, expected):
@@ -356,7 +399,7 @@ def test_eval_numeric(f1, f2, fix, data, target, expected):
 
 def test_eval_symbolic(f1):
     target = Datum('C1', 0.1, 'M')
-    expected = [Eq(Symbol('C1'), Symbol('df') * Symbol('C2'))]
+    expected = {Eq(Symbol('C1'), Symbol('df') * Symbol('C2'))}
     _assert_eval(f1,data={}, target=target, filters=[lambda l:l], symbolic=True, expected=expected)
 
 @pytest.mark.parametrize(
@@ -367,7 +410,7 @@ def test_eval_symbolic(f1):
             {Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.POSITIVES],
-            [1.0],
+            {1.0},
             id='filter-for-positives'
         ),
 
@@ -376,7 +419,7 @@ def test_eval_symbolic(f1):
             {Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.NEGATIVES],
-            [-6.0],
+            {-6.0},
             id='filter-for-negatives'
         ),
 
@@ -385,7 +428,7 @@ def test_eval_symbolic(f1):
             {Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.ZERO],
-            [0.0],
+            {0.0},
             id='filter-for-zero'
         ),
 
@@ -394,7 +437,7 @@ def test_eval_symbolic(f1):
             {Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.NON_NEG],
-            [0.0, 1.0],
+            {0.0, 1.0},
             id='filter-for-non-negatives'
         ),
 
@@ -403,7 +446,7 @@ def test_eval_symbolic(f1):
             {Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.NON_POS],
-            [-1.0, 0.0],
+            {-1.0, 0.0},
             id='filter-for-non-positives'
         ),
 
@@ -412,7 +455,7 @@ def test_eval_symbolic(f1):
             {Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.REAL_ONLY],
-            [],
+            set(),
             id='filter-for-real'
         )
     ]
@@ -438,14 +481,15 @@ def _assert_solve(f1, data, *, target, rounding, expected, exception=None, round
         f1._target = target
         res = f1.solve(rounding=rounding, round_to=round_to)
         print(*res)
+        print(*expected)
         assert res == expected
 
 @pytest.mark.parametrize(
     "data, target, expected",
     [
-        pytest.param({PD.df, PD.C1}, TS.C2, [PD.C2], id='solve-for-target'),
-        pytest.param({PD.df, PD.C1}, TS.df, [PD.df], id='solve-for-written-target'),
-        pytest.param({PD.df, PD.C1}, None, [PD.C2], id='solve-no-target')
+        pytest.param({PD.df, PD.C1}, TS.C2, {PD.C2}, id='solve-for-target'),
+        pytest.param({PD.df, PD.C1}, TS.df, {PD.df}, id='solve-for-written-target'),
+        pytest.param({PD.df, PD.C1}, None, {PD.C2}, id='solve-no-target')
     ]
 )
 def test_basic_solve(f1, data, target, expected):
@@ -456,10 +500,10 @@ def test_basic_solve(f1, data, target, expected):
     "data, target, rounding, round_to, expected",
     [
         # reminder: round_to is used only if target is not specified
-        pytest.param({PD.df, PD.C1}, TS.C2_alt, True,   2,  [Datum('C2', 0.5, 'M')],     id='rounding-from-target'),
-        pytest.param({PD.df, PD.C1}, None,      True,   1,  [Datum('C2', 0.5, 'M')],     id='rounding-from-round_to'),
-        pytest.param({PD.df, PD.C1}, TS.C2_alt, False,  2,  [PD.C2],                                            id='from-target-with-rounding=False'),
-        pytest.param({PD.df, PD.C1}, None,      False,  1,  [PD.C2],                                            id='from-round_to-with-rounding=False'),
+        pytest.param({PD.df, PD.C1}, TS.C2_alt, True,   2,  {Datum('C2', 0.5, 'M')},     id='rounding-from-target'),
+        pytest.param({PD.df, PD.C1}, None,      True,   1,  {Datum('C2', 0.5, 'M')},     id='rounding-from-round_to'),
+        pytest.param({PD.df, PD.C1}, TS.C2_alt, False,  2,  {PD.C2},                                            id='from-target-with-rounding=False'),
+        pytest.param({PD.df, PD.C1}, None,      False,  1,  {PD.C2},                                            id='from-round_to-with-rounding=False'),
     ]
 )
 def test_solve_rounding(f1, data, target, rounding, expected, round_to):
@@ -484,7 +528,7 @@ def test_solve_exceptions(f1, data, target, exception):
     [
         pytest.param(TS.df, TS.df, None, id='normal-set'),
         pytest.param(TS.df_str, TS.df, None, id='string-set'),
-        pytest.param('df = 1.2 L', None, InvalidUnitError, id='InvalidUnitError'),
+        pytest.param('df = 1.2 L', None, IncompatibleUnitsError, id='InvalidUnitError'),
         pytest.param('V0 = 22.4 L', None, SymbolNotFound, id='SymbolNotFound'),
     ]
 )
