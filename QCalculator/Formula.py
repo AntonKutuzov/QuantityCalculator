@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from numbers import Number
-
 from QCalculator.Exceptions.FormulaExceptions import (
-    RewritingError, IncompatibleUnitsError, OverlappingVariables, InvalidSymbol,
+    RewritingError, IncompatibleUnitsError, InvalidSymbol,
     ConsistencyError, EquationNotSolvable, FailedConsistencyCheck,
     SymbolNotFound, NoValueError, TargetNotFound, UnknownNotFound, NoneReferenceUnits, InvalidExpression
 )
@@ -11,8 +9,9 @@ from QCalculator import Datum
 
 from typing import Dict, Optional, List, overload, Set, Iterable
 from pint import Unit
-from sympy import parse_expr, Eq, solve, Float, simplify, im, Symbol
+from sympy import parse_expr, Eq, solve, Float, simplify, im, Symbol, Number
 from copy import deepcopy, copy
+
 
 
 class Formula:
@@ -57,7 +56,7 @@ class Formula:
 
         self._eq = self._as_sympy_eq(eq)
         self._ref_units = self._complete_ref_units(ref_units) if ref_units is not None else None
-        self._data: Set[Datum] = set()
+        self._data: Dict[str, Datum] = dict()
 
         self._target: Optional[Datum] = None
 
@@ -186,9 +185,9 @@ class Formula:
 
         vd = dict()
 
-        for d in self.data:
+        for s, d in self.data.items():
             d.ito_base_units()
-            vd.update({d.symbol : d.magnitude})
+            vd.update({s : d.magnitude})
 
         return vd
 
@@ -212,6 +211,8 @@ class Formula:
         """
 
         for datum in d:
+            old_data = self.data  # deepcopy(self._data)
+
             if not isinstance(datum, (Datum, str)):
                 raise TypeError(f'Expected Datum instance or str, got: "{type(d)}".')
 
@@ -230,8 +231,9 @@ class Formula:
                         details='To enable rewriting set the "rewrite" parameter to True.'
                     )
 
-            self._data.add(datum)
+            self._data.update({datum.symbol : datum})
             if not self.consistency_check(silent_failure=True, raise_exception=False) and not force_inconsistent:
+                self._data = old_data  # in case this exception is caught and the code runs further, we remove any changes
                 raise ConsistencyError(formula=self.eq_str, details=f'The last value to write was "{str(datum)}".')
 
     @overload
@@ -261,8 +263,7 @@ class Formula:
             self._confirm_symbol(var)
 
             if self.has_value(var):
-                ds = filter(lambda a: a.symbol == var, self._data)
-                ds = copy(list(ds)[0])
+                ds = copy(self._data[var])
 
                 if units is not None:
                     self._confirm_units(var, units)
@@ -292,7 +293,7 @@ class Formula:
     def erase(self, var: Optional[str] = None) -> None:
         if var is not None:
             d = self.read(var)  # variable is confirmed here
-            self._data.remove(d)
+            self._data.pop(d.symbol)
         else:
             for s in self.symbols:
                 self.erase(s)
@@ -364,17 +365,10 @@ class Formula:
 
         if isinstance(var, str):
             self._confirm_symbol(var)
-            ds = list(filter(lambda a: a.symbol == var, self._data))
+            ds = self._data.get(var)
 
-            if len(ds) > 1:
-                raise OverlappingVariables(
-                    formula=self.eq_str,
-                    vars=[d.symbol for d in ds],
-                    details='This error could only occur if you directly changed the protected attribute ._data. '
-                            'If this is not so, you have discovered a bug. Congratulations!'
-                )
-            else:
-                return len(ds) > 0
+            return ds is not None
+
 
         elif isinstance(var, (list, tuple, set)):
             res_list = list()
@@ -462,7 +456,7 @@ class Formula:
             *filters,
             rounding: bool = True,
             round_to: int = 2
-    ) -> Set[Datum]:
+    ) -> Dict[str, Datum]:
         """
         The solve() method wraps eval() method since often Formula is used to solve equations that yield real
         value which are compatible with the Datum class (imaginary or complex numbers are not). solve() also does
@@ -503,7 +497,7 @@ class Formula:
         # NOTE: filters must be directly passed to the eval() method. The tests do not account for filters in solve().
         sols: Set[Float] = self.eval(Formula.REAL_ONLY, *filters)
 
-        res = set()
+        res = dict()
 
         for sol in sols:
             sol = float(sol)  # from smypy Float to Python's native float
@@ -515,7 +509,7 @@ class Formula:
                 mag = round(d.magnitude, Datum.get_decimals(self.target.magnitude))
                 d = Datum(self.target.symbol, mag, self.target.units)
 
-            res.add(d)
+            res.update({d.symbol : d})
 
         if NONE_TARGET:
             self._target = None
@@ -578,7 +572,7 @@ class Formula:
             raise EquationNotSolvable(formula=self.eq_str)
 
     @property
-    def data(self) -> Set[Datum]:
+    def data(self) -> Dict[str, Datum]:
         """Returns a **deepcopy** of the data set where the written Datum instances are stored"""
         return deepcopy(self._data)
 

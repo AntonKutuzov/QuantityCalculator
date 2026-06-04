@@ -11,14 +11,14 @@ from QCalculator.Exceptions.LinearIteratorExceptions import (
 
 from typing import List, Dict, Optional, Set, overload
 from pint import Unit
-from copy import copy, deepcopy
+from copy import deepcopy
 
 
 class LinearIterator:
     def __init__(self, formulas: List[str], ref_units: Optional[Dict[str, str]] = None) -> None:
         self._formulas = self._normalize_formulas(formulas, ref_units)
         self._ref_units = self._select_units() if ref_units is not None else None
-        self._data = set()
+        self._data: Dict[str, Datum] = dict()
         self._target = None
 
     # ================================================================================================== PRIVATE HELPERS
@@ -98,7 +98,7 @@ class LinearIterator:
                     old_datum = self.read(d.symbol)
                     raise RewritingError(var=d.symbol, old=old_datum)
 
-            self._data.add(d)
+            self._data.update({d.symbol : d})
 
             for f in self._formulas:
                 if d.symbol in f.symbols:
@@ -121,8 +121,7 @@ class LinearIterator:
             self._confirm_symbol(var)
 
             if self.has_value(var):
-                d = filter(lambda d: d.symbol == var, self.data)
-                d = copy(list(d)[0])  # normally, only one Datum with any symbol is allowed in self._data
+                d = self._data[var]
 
                 if units is not None:
                     self._confirm_units(var, units)
@@ -152,7 +151,7 @@ class LinearIterator:
         if var is not None:
             if self.has_value(var):
                 d = self.read(var)  # variable is confirmed here
-                self._data.remove(d)
+                self._data.pop(d.symbol)
 
                 for f in self.formulas:
                     if var in f.symbols and f.has_value(var):
@@ -173,11 +172,11 @@ class LinearIterator:
     # ========================================================================================================= ANALYSIS
     def has_value(self, var: str) -> bool:
         self._confirm_symbol(var)
-        return len(list(filter(lambda d: d.symbol == var, self.data))) > 0
+        return self._data.get(var) is not None
 
 
     # ===================================================================================================== CALCULATIONS
-    def iter(self) -> Set[Datum]:
+    def iter(self) -> Dict[str, Datum]:
         """
         Takes all solvable equations in the LI and solves them **once**. Returns all the obtained
         Datum instances.
@@ -185,17 +184,17 @@ class LinearIterator:
         :return: set of newly obtained Datum instances
         """
 
-        res = set()
+        res = dict()
         for f in self.solvables:
             r = f.solve(rounding=False)
-            res = res.union(r)  # since each Datum in LI must have its own symbol, no overlaps are expected
+            res.update(r)
         return res
 
     def solve(self) -> Optional[Datum]:
         while self.solvables:
             res = self.iter()
 
-            self.write(*res)
+            self.write(*res.values())
 
             if self.target is None:  # if .target is None, it has to attribute .symbol => another if-statement
                 continue
@@ -222,7 +221,7 @@ class LinearIterator:
         return solvable_eqs
 
     @property
-    def data(self) -> Set[Datum]:
+    def data(self) -> Dict[str, Datum]:
         return deepcopy(self._data)
 
     @property

@@ -71,10 +71,10 @@ def li1():
 @pytest.fixture
 def data():
     return deepcopy({
-                Datum('n', 1.5, 'mole'),
-                Datum('M', 18, 'g/mole'),
-                Datum('NA', 6.02e23, 'mole**-1'),
-                Datum('wmm', 0.25, '')
+                'n':    Datum('n', 1.5, 'mole'),
+                'M':    Datum('M', 18, 'g/mole'),
+                'NA':   Datum('NA', 6.02e23, 'mole**-1'),
+                'wmm':  Datum('wmm', 0.25, '')
             })
 
 def exception_handling(exception):
@@ -197,13 +197,13 @@ def test_init_LI_units(li_formulas, li_units, expected_formulas, expected_units,
     [
         pytest.param(
             [Datum('n', 1.5, 'mole'), Datum('Vpg', 15, 'L')],
-            {Datum('n', 1.5, 'mole'), Datum('Vpg', 15, 'L')},
+            {'n':Datum('n', 1.5, 'mole'), 'Vpg':Datum('Vpg', 15, 'L')},
             None,
             id='writing-Datums'
         ),
         pytest.param(
             ['n = 1.5 mole', 'Vpg = 15 L'],
-            {Datum('n', 1.5, 'mole'), Datum('Vpg', 15, 'L')},
+            {'n':Datum('n', 1.5, 'mole'), 'Vpg':Datum('Vpg', 15, 'L')},
             None,
             id='writing-strings'
         ),
@@ -275,7 +275,7 @@ def test_write_symbol_and_units_exceptions(li1, data, exception):
     [
         pytest.param(
             ['n = 1.5 mole', 'mps = 10 g', 'n = 2 mole'],
-            {Datum('n', 2.0, 'mole'), Datum('mps', 10, 'g')},
+            {'n':Datum('n', 2.0, 'mole'), 'mps':Datum('mps', 10, 'g')},
             True,
             None,
             id='rewrite-True'
@@ -302,12 +302,6 @@ def test_rewriting(li1, data, expected_data, rewrite, exception):
 
 
 # ============================================================================================================== reading
-"""_reading_data = {
-                    Datum('n', 1.5, 'mole'),
-                    Datum('mps', 10, 'g'),
-                    Datum('NA', 6.02*10**23, 'mole**-1')
-                }
-"""
 @pytest.mark.parametrize(
     "var, units, expected",
     [
@@ -423,23 +417,23 @@ def test_read_exceptions(li1, data, var, units, expected, exception):
     [
         pytest.param(
             None,
-            set(),
+            dict(),
             None,
             id='erase-all'
         ),
         pytest.param(
             'n',
             {
-                Datum('M', 18, 'g/mole'),
-                Datum('NA', 6.02 * 10 ** 23, 'mole**-1'),
-                Datum('wmm', 0.25, '')
+                'M':    Datum('M', 18, 'g/mole'),
+                'NA':   Datum('NA', 6.02 * 10 ** 23, 'mole**-1'),
+                'wmm':  Datum('wmm', 0.25, '')
             },
             None,
             id='erase-one-var'
         ),
         pytest.param(
             'p',
-            set(),
+            dict(),
             UnusedSymbolError,
             id='erase-unused-var'
         ),
@@ -502,11 +496,11 @@ def test_has_value(li1, data, var, expected, exception):
 
 # ========================================================================================================= CALCULATIONS
 def test_iter(li1, data):
-    li1.write(*data)  # because it writes in both _data and the formulas
+    li1.write(*data.values())
     res = li1.iter()
     assert res == {
-        Datum('mps', 27, 'g'),
-        Datum('Np', 9.03*10**23, ''),
+        'mps':  Datum('mps', 27, 'g'),
+        'Np':   Datum('Np', 9.03*10**23, ''),
     }
 
 @pytest.mark.parametrize(
@@ -516,12 +510,12 @@ def test_iter(li1, data):
             Datum('mps', 0.01, 'g'),
             Datum('mps', 27.0, 'g'),
             {
-                Datum('n', 1.5, 'mole'),
-                Datum('M', 18, 'g/mole'),
-                Datum('NA', 6.02e23, 'mole**-1'),
-                Datum('wmm', 0.25, ''),
-                Datum('mps', 27.0, 'g'),
-                Datum('Np', 9.03e23, '')
+                'n':    Datum('n', 1.5, 'mole'),
+                'M':    Datum('M', 18, 'g/mole'),
+                'NA':   Datum('NA', 6.02e23, 'mole**-1'),
+                'wmm':  Datum('wmm', 0.25, ''),
+                'mps':  Datum('mps', 27.0, 'g'),
+                'Np':   Datum('Np', 9.03e23, '')
             },
             None,
             id='solve-with-target-default-units'
@@ -531,12 +525,12 @@ def test_iter(li1, data):
             Datum('mps', 0.01, 'kg'),
             Datum('mps', 27.0, 'g'),
             {
-                Datum('n', 1.5, 'mole'),
-                Datum('M', 18, 'g/mole'),
-                Datum('NA', 6.02e23, 'mole**-1'),
-                Datum('wmm', 0.25, ''),
-                Datum('mps', 0.027, 'kg'),
-                Datum('Np', 9.03e23, '')
+                'n':    Datum('n', 1.5, 'mole'),
+                'M':    Datum('M', 18, 'g/mole'),
+                'NA':   Datum('NA', 6.02e23, 'mole**-1'),
+                'wmm':  Datum('wmm', 0.25, ''),
+                'mps':  Datum('mps', 27.0, 'g'),
+                'Np':   Datum('Np', 9.03e23, '')
             },
             None,
             id='solve-with-target-compatible-units'
@@ -546,13 +540,13 @@ def test_iter(li1, data):
             None,
             None,
             {
-                Datum('n', 1.5, 'mole'),
-                Datum('M', 18, 'g/mole'),
-                Datum('NA', 6.02e23, 'mole**-1'),
-                Datum('wmm', 0.25, ''),
-                Datum('mps', 27.0, 'g'),
-                Datum('Np', 9.03e23, ''),
-                Datum('msm', 108, 'g')
+                'n':    Datum('n', 1.5, 'mole'),
+                'M':    Datum('M', 18, 'g/mole'),
+                'NA':   Datum('NA', 6.02e23, 'mole**-1'),
+                'wmm':  Datum('wmm', 0.25, ''),
+                'mps':  Datum('mps', 27.0, 'g'),
+                'Np':   Datum('Np', 9.03e23, ''),
+                'msm':  Datum('msm', 108, 'g')
             },
             None,
             id='solve-without-target'
@@ -562,13 +556,13 @@ def test_iter(li1, data):
             Datum('V0', 0.01, 'L/mole'),
             None,
             {
-                Datum('n', 1.5, 'mole'),
-                Datum('M', 18, 'g/mole'),
-                Datum('NA', 6.02e23, 'mole**-1'),
-                Datum('wmm', 0.25, ''),
-                Datum('mps', 27.0, 'g'),
-                Datum('Np', 9.03e23, ''),
-                Datum('msm', 108, 'g')
+                'n':    Datum('n', 1.5, 'mole'),
+                'M':    Datum('M', 18, 'g/mole'),
+                'NA':   Datum('NA', 6.02e23, 'mole**-1'),
+                'wmm':  Datum('wmm', 0.25, ''),
+                'mps':  Datum('mps', 27.0, 'g'),
+                'Np':   Datum('Np', 9.03e23, ''),
+                'msm':  Datum('msm', 108, 'g')
             },
             UnreachableTarget,
             id='solve-unreachable-target'
@@ -585,7 +579,7 @@ def test_solve(li1, data, target, expected_return, expected_data, exception):
     """
 
     with exception_handling(exception):
-        li1.write(*data)
+        li1.write(*data.values())
 
         if target is not None:
             li1.target = target
@@ -608,8 +602,9 @@ def test_solvables(li1, data):
         Formula('wmm = mps/msm', ref_units=units1)
     }
 
-    complete_data = data.union({Datum('mps', 27, 'g')})
-    li1.write(*complete_data)
+    complete_data = deepcopy(data)
+    complete_data.update({'mps':Datum('mps', 27, 'g')})
+    li1.write(*complete_data.values())
     assert li1.solvables == expected
 
 def test_data(li1, data):
@@ -623,7 +618,7 @@ def test_data(li1, data):
     assert li1.data == data
 
     d = li1.data
-    d.pop()
+    d.pop('n')
     assert li1.data == data
 
 
