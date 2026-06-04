@@ -9,7 +9,7 @@ from QCalculator.Exceptions.LinearIteratorExceptions import (
     UnreachableTarget
 )
 
-from typing import List, Dict, Tuple, Optional, Set, overload
+from typing import List, Dict, Optional, Set, overload
 from pint import Unit
 from copy import copy, deepcopy
 
@@ -175,6 +175,7 @@ class LinearIterator:
         self._confirm_symbol(var)
         return len(list(filter(lambda d: d.symbol == var, self.data))) > 0
 
+
     # ===================================================================================================== CALCULATIONS
     def iter(self) -> Set[Datum]:
         """
@@ -251,29 +252,3 @@ class LinearIterator:
             self._target = datum
         else:
             raise TypeError(f'Expected "str" or "Datum", got "{type(datum)}".')
-
-
-
-if __name__ == "__main__":
-    fs = ['n = mps/M', 'wmm = mps/msm', 'n = Np/NA']
-    us = {
-        'wmm':'',
-        'mps':'g',
-        'n':'mole',
-        'msm':'g',
-        'M':'g/mole',
-        'Np':'',
-        'NA':'mole**-1'
-    }
-    data = [
-        'wmm = 0.1',
-        'msm = 30 g',
-        'M = 18 g/mole',
-        'NA = 6.02e23 1/mole',
-        'Np = 1'
-    ]
-
-    li = LinearIterator(fs, us)
-    li.target = 'mps = 0.01 g'
-    li.write(*data)
-    print(li.solve())

@@ -60,19 +60,16 @@ from __future__ import annotations
 from pint import UnitRegistry, Quantity, Unit, DimensionalityError
 from sympy.parsing.sympy_parser import parse_expr
 from sympy import Symbol
-from copy import copy
 from typing import Optional, Tuple
 
-from QCalculator.Exceptions.DatumExceptions import InvalidSymbol, InitializationError, IncompatibleUnits
+from QCalculator.Exceptions.DatumExceptions import InitializationError, IncompatibleUnits
 
 
 # class implementation
 class Datum:
     ureg = UnitRegistry(system='SI')
     _FORBIDDEN_SYMBOLS: Tuple[str] = ('', ' ')
-    ROUNDING: int = 15
-    # is needed to remove 1's after calculations in Formula. Removal is needed for hash function to work properly
-    # Do not set ROUNDING to more than 15. If equal Datums a said to be different, try setting it to 14 or 13.
+
 
     def __init__(self,
                  symbol: str,

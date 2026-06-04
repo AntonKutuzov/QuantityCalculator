@@ -3,7 +3,7 @@ from __future__ import annotations
 from numbers import Number
 
 from QCalculator.Exceptions.FormulaExceptions import (
-    RewritingError, IncompatibleUnitsError, OverlappingVariables, InvalidSymbol, WrongUnitEquation,
+    RewritingError, IncompatibleUnitsError, OverlappingVariables, InvalidSymbol,
     ConsistencyError, EquationNotSolvable, FailedConsistencyCheck,
     SymbolNotFound, NoValueError, TargetNotFound, UnknownNotFound, NoneReferenceUnits, InvalidExpression
 )
