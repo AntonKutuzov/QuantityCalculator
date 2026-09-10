@@ -1,19 +1,18 @@
 from QCalculator import LinearIterator, Formula, Datum
-from QCalculator.Exceptions.DatumExceptions import InitializationError, InvalidSymbol
-from QCalculator.Exceptions.FormulaExceptions import NoneReferenceUnits
+from QCalculator.Exceptions.DatumExceptions import InvalidString, InvalidSymbol, UndefinedUnit
+from QCalculator.Exceptions.FormulaExceptions import SymbolNotFound
 from QCalculator.Exceptions.LinearIteratorExceptions import (
     NoValueError,
     FormulasNotIndicated,
     UnreachableTarget,
     UnusedSymbolError,
     IncompatibleUnitsError,
-    RewritingError
+    RewritingError,
 )
-
 import pytest
 from contextlib import nullcontext
-import pint
 from copy import deepcopy
+
 
 # ============================================================================================= PRESET DATA AND FIXTURES
 def dict_is_subset(sub, sup):
@@ -162,7 +161,7 @@ def test_init_LI_formulas(li_formulas, li_units, expected_formulas, expected_uni
             dict([(k,v) if not k == 'n' else (v, 'qwerty') for k, v in units1.items()]),  # replace 'n':'mole' for 'n':'qwerty'
             set([Formula(f) for f in formulas1[:2]]),
             set(),
-            pint.UndefinedUnitError,
+            UndefinedUnit,
             id='init-invalid-units'
         ),
         pytest.param(
@@ -170,7 +169,7 @@ def test_init_LI_formulas(li_formulas, li_units, expected_formulas, expected_uni
             dict([(k, v) if not k == 'n' else ('p', v) for k, v in units1.items()]),  # replace 'n':'mole' for 'p':'mole'
             set([Formula(f) for f in formulas1[:2]]),
             set(),
-            NoneReferenceUnits,  # we *replaced* 'n' for 'p', so now there are no key 'n' and hence no units for 'n' can be found
+            SymbolNotFound,  # we *replaced* 'n' for 'p', so now there are no key 'n'
             id='init-no-unit-found'
         ),
     ]
@@ -222,13 +221,13 @@ def test_init_LI_units(li_formulas, li_units, expected_formulas, expected_units,
         pytest.param(
             ['definitely not a datum definition string'],
             list(),
-            InitializationError,
+            InvalidString,
             id='writing-invalid-string'
         ),
         pytest.param(
             [' = 15 L', '= 1.5 mole'],
             list(),
-            InitializationError,
+            InvalidString,
             id='writing-forbidden-string'
         ),
     ]
@@ -364,7 +363,7 @@ def test_basic_read(li1, data, var, units, expected):
             '',
             None,
             None,
-            InvalidSymbol,
+            InvalidString,
             id='read-var=empty-string'
         ),
         pytest.param(
@@ -477,7 +476,7 @@ def test_erase(li1, data, var, expected_data, exception):
         pytest.param(
             '',
             False,
-            InvalidSymbol
+            InvalidString
         )
     ]
 )
@@ -678,14 +677,14 @@ def test_target(li1):
         pytest.param(
             '= 0.01 kPa',
             None,
-            InitializationError,
+            InvalidString,
             id='invalid-symbol-as-target-1'
         ),
 
         pytest.param(
             'S = 0.01 m',
             None,
-            InitializationError,
+            InvalidSymbol,
             id='invalid-symbol-as-target-2'
         ),
 

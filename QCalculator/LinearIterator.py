@@ -1,5 +1,5 @@
 from QCalculator import Formula, Datum
-from QCalculator.Exceptions.DatumExceptions import InvalidSymbol
+from QCalculator.Exceptions.DatumExceptions import InvalidDatumDefString
 from QCalculator.Exceptions.LinearIteratorExceptions import (
     NoValueError,
     UnusedSymbolError,
@@ -9,13 +9,14 @@ from QCalculator.Exceptions.LinearIteratorExceptions import (
     UnreachableTarget
 )
 
-from typing import List, Dict, Optional, Set, overload
+from typing import List, Dict, Optional, Set, overload, Tuple
+from collections.abc import Iterable, Sequence
 from pint import Unit
 from copy import deepcopy
 
 
 class LinearIterator:
-    def __init__(self, formulas: List[str], ref_units: Optional[Dict[str, str]] = None) -> None:
+    def __init__(self, formulas: List[str], ref_units: Optional[Dict[str|Tuple, str|Unit]] = None) -> None:
         self._formulas = self._normalize_formulas(formulas, ref_units)
         self._ref_units = self._select_units() if ref_units is not None else None
         self._data: Dict[str, Datum] = dict()
@@ -51,8 +52,8 @@ class LinearIterator:
         return fs
 
     def _confirm_symbol(self, var: str, raise_exception: bool = True) -> bool:
-        if Datum._symbol_forbidden(var):
-            raise InvalidSymbol(var=var, details='Cannot use spaces and empty strings to define Datum.')
+        if not Datum._confirm_symbol(var, raise_exception=False):
+            raise InvalidDatumDefString(string=var, details=f'The symbol "{var}" cannot be used.')
 
         for f in self.formulas:
             if var in f.symbols:
@@ -109,13 +110,13 @@ class LinearIterator:
         ...
 
     @overload
-    def read(self, var: List[str], units: Optional[List[str]] = None) -> List[Datum]:
+    def read(self, var: List[str], units: Optional[List[str]] = None) -> Dict[str, Datum]:
         ...
 
     def read(self,
              var: str|List[str],
              units: Optional[str | Unit | List[str|Unit]] = None
-             ) -> Datum | List[Datum]:
+             ) -> Datum | Dict[str, Datum]:
 
         if isinstance(var, str):
             self._confirm_symbol(var)
@@ -136,10 +137,10 @@ class LinearIterator:
                 units = len(var)*[None]  # because in the next if- units must be a list
 
             if len(var) == len(units):
-                res = list()
+                res = dict()
                 for v, u in zip(var, units):
                     r = self.read(v, u)
-                    res.append(r)
+                    res[v] = r
 
                 return res
             else:
@@ -147,33 +148,62 @@ class LinearIterator:
         else:
             raise TypeError('The read() method accepts its parameters either as string or as lists of strings.')
 
-    def erase(self, var: Optional[str] = None) -> None:
-        if var is not None:
+    @overload
+    def erase(self) -> None:
+        ...
+
+    @overload
+    def erase(self, var: str) -> None:
+        ...
+
+    @overload
+    def erase(self, var: List[str]) -> None:
+        ...
+
+    def erase(self, var: Optional[Iterable[str] | str] = None) -> None:
+        if isinstance(var, str):
             if self.has_value(var):
                 d = self.read(var)  # variable is confirmed here
                 self._data.pop(d.symbol)
 
-                for f in self.formulas:
+                for f in self._formulas:
                     if var in f.symbols and f.has_value(var):
                         f.erase(var)
 
-            elif var in self.symbols:
-                raise NoValueError(symbol=var)
+        elif isinstance(var, Iterable):
+            for s in var:
+                self.erase(s)
 
-            else:
-                raise UnusedSymbolError(symbol=var)
+        elif var is None:
+            self.erase(self.symbols)
 
         else:
-            for s in self.symbols:
-                if self.has_value(s):
-                    self.erase(s)
+            raise TypeError(f'Expected "str" or "Iterable[str]", got "{type(var)}".')
 
 
     # ========================================================================================================= ANALYSIS
+    @overload
     def has_value(self, var: str) -> bool:
-        self._confirm_symbol(var)
-        return self._data.get(var) is not None
+        ...
 
+    @overload
+    def has_value(self, var: Sequence[str]) -> List[bool]:
+        ...
+
+    def has_value(self, var: str|Sequence[str]) -> bool|List[bool]:
+        if isinstance(var, str):
+            self._confirm_symbol(var)
+            return self._data.get(var) is not None
+
+        elif isinstance(var, Sequence):
+            hvl = list()
+            for v in var:
+                hv = self.has_value(v)
+                hvl.append(hv)
+            return hvl
+
+        else:
+            raise TypeError(f'Expected "str" or "Sequence[str]", got "{type(var)}".')
 
     # ===================================================================================================== CALCULATIONS
     def iter(self) -> Dict[str, Datum]:
@@ -181,7 +211,7 @@ class LinearIterator:
         Takes all solvable equations in the LI and solves them **once**. Returns all the obtained
         Datum instances.
 
-        :return: set of newly obtained Datum instances
+        :return: dict of newly obtained Datum instances, Dict[str, Datum]
         """
 
         res = dict()
@@ -191,6 +221,8 @@ class LinearIterator:
         return res
 
     def solve(self) -> Optional[Datum]:
+        tempvars = list()
+
         while self.solvables:
             res = self.iter()
 
@@ -199,7 +231,8 @@ class LinearIterator:
             if self.target is None:  # if .target is None, it has to attribute .symbol => another if-statement
                 continue
             elif self.has_value(self.target.symbol):
-                return self.read(self.target.symbol, self.target.units)
+                solution = self.read(self.target.symbol, self.target.units)
+                return solution
             else:  # if no value
                 continue
 
@@ -244,10 +277,8 @@ class LinearIterator:
 
     @target.setter
     def target(self, datum: Datum|str) -> None:
-        if isinstance(datum, (str, Datum)):
-            datum = Datum.as_datum(datum)
-            self._confirm_symbol(datum.symbol)
-            self._confirm_units(datum.symbol, datum.units)
-            self._target = datum
-        else:
-            raise TypeError(f'Expected "str" or "Datum", got "{type(datum)}".')
+        # runs type check, relevant string or symbol check
+        datum = Datum.as_datum(datum)
+        self._confirm_symbol(datum.symbol)
+        self._confirm_units(datum.symbol, datum.units)
+        self._target = datum

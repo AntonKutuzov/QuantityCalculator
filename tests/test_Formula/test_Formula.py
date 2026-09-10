@@ -9,13 +9,14 @@ from QCalculator.Exceptions.FormulaExceptions import (
     TargetNotFound,
     UnknownNotFound,
     EquationNotSolvable,
-    NoneReferenceUnits, InvalidExpression
+    NoneReferenceUnits,
+    InvalidExpression
 )
-import pint
+from tests import exception_handling
 
+from pint import UndefinedUnitError
 import pytest
 from sympy import Eq, Symbol
-from contextlib import nullcontext
 from dataclasses import dataclass
 
 
@@ -62,14 +63,6 @@ def f1():
 def f2():
     return Formula('y = x**2 + 5*x + 6')
 
-def exception_handling(exception):
-    return (
-        nullcontext()
-        if exception is None
-        else
-        pytest.raises(exception)
-    )
-
 # ========================================================================================================= INITIALIZING
 @pytest.mark.parametrize(
     "formula, equation, ref_units, symbols, exception",
@@ -103,7 +96,7 @@ def exception_handling(exception):
             '-C1/C2 + df = 0',
             {'df':'', 'C1':'hello', 'C2':'M'},
             {'df', 'C1', 'C2'},
-            pint.UndefinedUnitError,
+            UndefinedUnitError,
             id='init-with-invalid-units'
         ),
         pytest.param(
@@ -225,6 +218,17 @@ def test_write_consistency_check(f1, data, force_inc, exception, expected_data):
 def test_type_exceptions_for_write(f1, data, exception, expected_data):
     _assert_write_case(f1, data=data, exception=exception, expected_data=expected_data)
 
+def test_write_safety(f1):
+    f1.write('C1 = 2 mole/L', 'C2 = 4 mole/L')
+
+    try:
+        f1.write('df = 1')  # df must be 0.5 -> inconsistent data
+    except ConsistencyError:
+        assert f1.data == {
+            'C1': Datum('C1', 2, 'M'),
+            'C2': Datum('C2', 4, 'M')
+        }
+
 
 # ============================================================================================================== reading
 def _assert_read_case(f1, data, *, units=None, exception=None, expected):
@@ -232,7 +236,6 @@ def _assert_read_case(f1, data, *, units=None, exception=None, expected):
 
     with exception_handling(exception):
         res = f1.read(data, units)
-        print('\n', *f1._data)
         assert res == expected
 
 @pytest.mark.parametrize(
@@ -264,12 +267,26 @@ def test_read_with_units(f1, data, units, expected):
         pytest.param('C2',          None,                   NoValueError,       None,   id='NoValueError-single'),
         pytest.param(['C1', 'C2'],  ['mmol/L', 'mmol/L'],   NoValueError,       None,   id='NoValueError-list'),
         pytest.param('C1',          'kHz',                  IncompatibleUnitsError, None, id='InvalidUnitError-single'),
-        pytest.param(['C1', 'df'], [None, 'M'],             IncompatibleUnitsError, None, id='InvalidUnitError-list')
+        pytest.param(['C1', 'df'],  [None, 'M'],            IncompatibleUnitsError, None, id='InvalidUnitError-list')
     ]
 )
 def test_read_exceptions(f1, data, units, exception, expected):
     _assert_read_case(f1, data, exception=exception, units=units, expected=expected)
 
+@pytest.mark.parametrize(
+    "var, units, exception",
+    [
+        pytest.param('C1', 'M', None, id='normal-read'),
+        pytest.param('C1', 'kg', IncompatibleUnitsError, id='read-incompatible-units'),
+        pytest.param('C1', 'mmol/L', None, id='real-compatible-units')
+    ]
+)
+def test_read_safety(f1, var, units, exception):
+    f1._data = {'df': PD.df, 'C1': PD.C1, 'C2': PD.C2}
+
+    with exception_handling(exception):
+        f1.read(var, units)
+        assert f1.data == {'df': PD.df, 'C1': PD.C1, 'C2': PD.C2}
 
 # ============================================================================================================== erasing
 def _assert_erase_case(f1, data, var, *, exception=None, expected):
@@ -367,22 +384,27 @@ def _assert_eval(f, data, *, target, filters, symbolic, expected, exception=None
     with exception_handling(exception):
         f._data = data
         f._target = target
-        res = f.eval(*filters, symbolic=symbolic)
+
+        if symbolic:
+            res = f.eval_symbolic()
+        else:
+            res = f.eval_numeric(*filters)
+
         assert res == expected
 
 @pytest.mark.parametrize(
     "fix, data, target, expected",
     [
-        pytest.param('f1', {'C1':PD.C1, 'C2':PD.C2}, TS.df, {2.5}, id='single-solution'),
+        pytest.param('f1', {'C1':PD.C1, 'C2':PD.C2}, TS.df, [2.5], id='single-solution'),
         pytest.param(
             'f2',
             {'y':Datum('y', 0.0, '')},
             Datum('x', 0.01, ''),
-            {-3.00000000000000, -2.00000000000000},
+            [-3.00000000000000, -2.00000000000000],
             id='several-solutions'
         ),
-        pytest.param('f1', {'C1':PD.C1}, TS.df, {1200.0/Symbol('C2')}, id='partial-solution'),
-        pytest.param('f1', {'df':PD.df, 'C1':PD.C1}, TS.df, {PD.df.magnitude}, id='target-already-written')
+        pytest.param('f1', {'C1':PD.C1}, TS.df, [1200.0/Symbol('C2')], id='partial-solution'),
+        pytest.param('f1', {'df':PD.df, 'C1':PD.C1}, TS.df, [PD.df.magnitude], id='target-already-written')
     ]
 )
 def test_eval_numeric(f1, f2, fix, data, target, expected):
@@ -397,7 +419,7 @@ def test_eval_numeric(f1, f2, fix, data, target, expected):
 
 def test_eval_symbolic(f1):
     target = Datum('C1', 0.1, 'M')
-    expected = {Eq(Symbol('C1'), Symbol('df') * Symbol('C2'))}
+    expected = [Eq(Symbol('C1'), Symbol('df') * Symbol('C2'))]
     _assert_eval(f1,data={}, target=target, filters=[lambda l:l], symbolic=True, expected=expected)
 
 @pytest.mark.parametrize(
@@ -408,7 +430,7 @@ def test_eval_symbolic(f1):
             {'y':Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.POSITIVES],
-            {1.0},
+            [1.0],
             id='filter-for-positives'
         ),
 
@@ -417,7 +439,7 @@ def test_eval_symbolic(f1):
             {'y':Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.NEGATIVES],
-            {-6.0},
+            [-6.0],
             id='filter-for-negatives'
         ),
 
@@ -426,7 +448,7 @@ def test_eval_symbolic(f1):
             {'y':Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.ZERO],
-            {0.0},
+            [0.0],
             id='filter-for-zero'
         ),
 
@@ -435,7 +457,7 @@ def test_eval_symbolic(f1):
             {'y':Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.NON_NEG],
-            {0.0, 1.0},
+            [0.0, 1.0],
             id='filter-for-non-negatives'
         ),
 
@@ -444,7 +466,7 @@ def test_eval_symbolic(f1):
             {'y':Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.NON_POS],
-            {-1.0, 0.0},
+            [-1.0, 0.0],
             id='filter-for-non-positives'
         ),
 
@@ -453,7 +475,7 @@ def test_eval_symbolic(f1):
             {'y':Datum('y', 0.0, '')},
             Datum('x', 0.1, ''),
             [Formula.REAL_ONLY],
-            set(),
+            list(),
             id='filter-for-real'
         )
     ]
@@ -471,15 +493,14 @@ def test_eval_preset_filters(f, data, target, filters, expected):
 def test_eval_exceptions(f1, data, target, exception):
     _assert_eval(f1, data, target=target, filters=[Formula.NO_FILTER], exception=exception, expected=None, symbolic=False)
 
+
 # ================================================================================================================ solve
 def _assert_solve(f1, data, *, target, rounding, expected, exception=None, round_to=2):
     # filters are not tested since they are directly passed to the eval() function
     with exception_handling(exception):
         f1._data = data
         f1._target = target
-        res = f1.solve(rounding=rounding, round_to=round_to)
-        print(*res)
-        print(*expected)
+        res = f1.solve(rounding=rounding, round_target=round_to)
         assert res == expected
 
 @pytest.mark.parametrize(
@@ -487,7 +508,7 @@ def _assert_solve(f1, data, *, target, rounding, expected, exception=None, round
     [
         pytest.param({'df':PD.df, 'C1':PD.C1}, TS.C2, {'C2':PD.C2}, id='solve-for-target'),
         pytest.param({'df':PD.df, 'C1':PD.C1}, TS.df, {'df':PD.df}, id='solve-for-written-target'),
-        pytest.param({'df':PD.df, 'C1':PD.C1}, None, {'C2':PD.C2}, id='solve-no-target')
+        pytest.param({'df':PD.df, 'C1':PD.C1}, None,  {'C2':PD.C2}, id='solve-no-target')
     ]
 )
 def test_basic_solve(f1, data, target, expected):

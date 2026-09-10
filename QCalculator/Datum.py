@@ -1,17 +1,25 @@
 from __future__ import annotations
 
-from pint import UnitRegistry, Quantity, Unit, DimensionalityError
+from pint import UnitRegistry, Quantity, Unit, DimensionalityError, UndefinedUnitError
+from typing import Any, Literal
 from sympy.parsing.sympy_parser import parse_expr
-from sympy import Symbol
-from typing import Optional, Tuple
+from numbers import Real
 
-from QCalculator.Exceptions.DatumExceptions import InitializationError, IncompatibleUnits
-
+from QCalculator.Exceptions.DatumExceptions import (
+    IncompatibleUnits,
+    InvalidVarName
+)
+from QCalculator.DatumDefString import DatumDefString
 
 
 class Datum:
+    #           SETTINGS            #
+
+    SYMPY_SAFE: bool = True         # if True, restricts 'symbol' to strings that can be converted to sympy.Symbol
+
+    #           SETTINGS            #
+
     ureg = UnitRegistry(system='SI')
-    _FORBIDDEN_SYMBOLS: Tuple[str] = ('', ' ')
 
 
     def __init__(self,
@@ -20,92 +28,109 @@ class Datum:
                  units: str|Unit
                  ) -> None:
 
-        if not isinstance(symbol, str):
-            raise TypeError('Symbol for Datum must be given as a string.')
+        Datum._validate_type('symbol', symbol)
+        Datum._validate_type('magnitude', magnitude)
+        Datum._validate_type('units', unit)
+        Datum._confirm_symbol(symbol)
 
-        if Datum._sympy_symbol_check(symbol) and not Datum._symbol_forbidden(symbol):
-            self._symbol: str = symbol
-            self._magnitude: float = float(magnitude)
+        self._symbol: str = symbol
+        self._magnitude: float = float(magnitude)
+        self._units: Unit = Datum.normalize_units(unit)
+        self._dds: DatumDefString = DatumDefString(self.__str__())
 
-            try:
-                self._units: Unit = Datum.normalize_units(units)
-            except TypeError as te:
-                raise InitializationError((symbol, magnitude, str(units)), details='Check that the units are of correct type.') from te
-        else:
-            raise InitializationError(
-                symbol,
-                details=f'The symbol "{symbol}" cannot be used in sympy expressions.'
+    # ================================================================================================== PRIVATE HELPERS
+    @classmethod
+    def _confirm_symbol(cls, symbol: str, raise_exception: bool = True) -> bool:
+        """
+        Returns True if the symbol matches the regular expression specified for symbols, False otherwise.
+        If "raise_exception" is set to True, raises InvalidVarName exception if the symbol does **not** match re.
+
+        :param symbol: str, symbol to be checked
+        :param raise_exception: if True, raises InvalidVarName for string that do not match the regular expression
+        :return: bool
+        """
+
+        res = DatumDefString.patterns.variable.fullmatch(symbol)
+
+        if res is None and raise_exception:
+            raise InvalidVarName(
+                var=symbol,
+                details=f'The symbol "{symbol}" does not match the allowed pattern for variables.'
             )
+
+        if cls.SYMPY_SAFE:
+            try:
+                parse_expr(f'{symbol} - 1')
+            except TypeError:
+                if raise_exception:
+                    raise InvalidVarName(
+                        var=symbol,
+                        details=f'The symbol "{symbol}" cannot be used in sympy expressions.'
+                    )
+                else:
+                    return False
+
+        return res is not None  # if it matches, it is not None
 
     @staticmethod
-    def from_quantity(symbol: str, quantity: Quantity) -> Datum:
-        sp_check = Datum._sympy_symbol_check(symbol)
-        fs_check = not Datum._symbol_forbidden(symbol)
+    def _validate_type(check_for: Literal['symbol', 'magnitude', 'units'], var: Any) -> None:
+        symbol_types = (str,)
+        magnitude_types = (Real,)
+        magnitude_forbidden = (bool,)
+        units_types = (str, Unit)
 
-        if sp_check and fs_check:
-            units = Datum.normalize_units(quantity.units)
-            return Datum(symbol, quantity.magnitude, units)
+        check_types = tuple()
+        avoid = tuple()
 
-        elif not sp_check:
-            raise InitializationError(
-                symbol,
-                details='Cannot create Datum with this symbol, because it cannot be used in sympy expressions.'
-            )
+        match check_for:
+            case 'symbol':
+                check_types = symbol_types
+                avoid = tuple()
+            case 'magnitude':
+                check_types = magnitude_types
+                avoid = magnitude_forbidden
+            case 'units':
+                check_types = units_types
+                avoid = tuple()
+            case _:
+                raise ValueError(f'The "check_for" parameter must be a string "symbol", "magnitude", or "units", got: "{check_for}" or type "{type(check_for)}".')
 
-        elif not fs_check:
-            raise InitializationError(
-                symbol,
-                details='Cannot create Datum with this symbol.'
-            )
-
+        if isinstance(var, check_types) and not isinstance(var, avoid):
+            return
         else:
-            raise Exception('This is not supposed to happen. There is a bug in the code.')
+            raise TypeError(f'The attribute "{check_for}" must be of types "{check_types}", got: {type(var)}.')
+
+    # ========================================================================================= ALTERNATIVE CONSTRUCTORS
+    @classmethod
+    def from_quantity(cls, symbol: str, quantity: Quantity) -> Datum:
+        cls._validate_type('symbol', symbol)
+
+        if not isinstance(quantity, Quantity):
+            raise TypeError(f'Expected "pint.Quantity", got: "{type(quantity)}".')
+
+        cls._confirm_symbol(symbol)
+        units = cls.normalize_units(quantity.units)
+
+        return Datum(symbol, quantity.magnitude, units)
 
 
     @staticmethod
     def from_string(datum: str) -> Datum:
-        """The general format is "<symbol> = <int or float number> <units>". Spaces are mandatory."""
-        try:
-            symbol, rest = datum.split('=')
-            symbol = symbol.strip(' ')
+        dds = DatumDefString(datum)
+        return Datum(dds.variable, dds.magnitude, dds.unit)
 
-            if Datum._symbol_forbidden(symbol):
-                raise InitializationError(symbol, details='This symbol cannot be used for instantiating Datum.')
 
-            rest = rest.strip(' ')
-            rest += ' '  # to make it possible to convert ' ' to 'dimensionless'
-            number, units = rest.split(' ', maxsplit=1)
-
-            try:
-                number = float(number)
-            except ValueError as e:
-                if '*' or '^' in number:
-                    raise InitializationError(number, details=''
-                                                            'To indicate powers use e-notation (ae+b or ae-b).'
-                                                            ' Check that you have a space between the magnitude and the units of the Datum.'
-                                                            '') from e
-                else:
-                    raise InitializationError(number, details='Check that you have a space between number and units. "10km" is wrong, "10 km" is correct.') from e
-
-            units = Datum.normalize_units(units)
-
-        except ValueError as e:
-            raise InitializationError(
-                datum,
-                details=f'Invalid Datum definition string. Check the format: <symbol> = <magnitude> <units> (including spaces):'
-                        f' "{datum}".'
-            ) from e
-
-        return Datum(symbol, number, units)
-
-    @staticmethod
+    @classmethod
     def as_datum(
+            cls,
             d: Datum|Quantity|str,
             symbol: str = ''
     ) -> Datum:
         """Depending on the type of the parameter "d", uses either .from_string() or .from_quantity(), or just returns
         the copy of the parameter so that the object returned is always a Datum instance. Passing Quantity instance also
-        requires passing in "symbol" parameter."""
+        requires passing in "symbol" parameter.
+
+        Does that method make sense if you still have to give symbol for quantity, and not for Datum?"""
 
         if isinstance(d, Datum):
             newd = Datum(d.symbol, d.magnitude, d.units)
@@ -113,16 +138,14 @@ class Datum:
             # so that changes of the returned object do not affect the original one and vice versa
             # copy() is not used, because magnitude must be rounded initially.
         elif isinstance(d, Quantity):
-            return Datum.from_quantity(symbol, d)
+            return cls.from_quantity(symbol, d)
         elif isinstance(d, str):
-            return Datum.from_string(d)
+            return cls.from_string(d)
         else:
-            raise InitializationError(
-                type(d),
-                details=f'The parameter "d" has a wrong type. Expected "Datum", "str" or "pint.Quantity".'
-            )
+            raise TypeError(f'The parameter "d" has a wrong type. Expected "Datum", "str" or "pint.Quantity", got "{type(d)}".')
 
 
+    # ==================================================================================================== MAGIC METHODS
     def __str__(self) -> str:
         """Returns a string of the form <variable> = <magnitude> <units>. For example, 'm = 10 g' or 'v = 2 m/s'"""
         return f'{self.symbol} = {self.magnitude} {self.units_str}'
@@ -136,212 +159,91 @@ class Datum:
         :return:
         """
 
+        return self.eq(other, strict=True)
+
+    def eq(self, other: Datum, strict: bool = False) -> bool:
+        if not isinstance(other, Datum):
+            raise TypeError(f'Expected "Datum", got: "{type(other)}".')
+
         from math import isclose
 
-        self_q = self.quantity
-        other_q = other.quantity
-
-        self_mag = self_q.to_base_units().magnitude
-        other_mag = other_q.to_base_units().magnitude
-
-        conditions = [
-            self.base_units == other.base_units,
-            isclose(self_mag, other_mag),
+        mild_conditions = [
+            self.base.units == other.base.units,
+            isclose(self.base.magnitude, self.base.magnitude),
             self.symbol == other.symbol
         ]
+
+        strict_conditions = [
+            self.units == other.units,
+            isclose(self.magnitude, self.magnitude),
+            self.symbol == other.symbol
+        ]
+
+        conditions = strict_conditions if strict else mild_conditions
         return all(conditions)
 
-
-    # ====================================================================================================== ARITHMETICS
-    def div(self, other: Datum|Quantity) -> Quantity:
-        q = Datum._get_quantity(other)
-        res = self.quantity / q
-        res.ito_reduced_units()
-        return res
-
-    def rdiv(self, other: Datum|Quantity) -> Quantity:
-        q = Datum._get_quantity(other)
-        res = q / self.quantity
-        res.ito_reduced_units()
-        return res
-
-    def mul(self, other: Datum|Quantity) -> Quantity:
-        q = Datum._get_quantity(other)
-        res = q * self.quantity
-        res.ito_reduced_units()
-        return res
-
-    def add(self, other: Datum|Quantity) -> Quantity:
-        q = Datum._get_quantity(other)
-
-        if self.is_compatible(other):
-            return self.quantity + q
-        else:
-            raise IncompatibleUnits(
-                from_unit=self.units_str,
-                to_unit=str(other.units),
-            )
-
-    def sub(self, other: Datum|Quantity) -> Quantity:
-        q = Datum._get_quantity(other)
-
-        if self.is_compatible(other):
-            return self.quantity - q
-        else:
-            raise IncompatibleUnits(
-                from_unit=self.units_str,
-                to_unit=str(other.units),
-            )
-
-    def rsub(self, other: Datum|Quantity) -> Quantity:
-        q = Datum._get_quantity(other)
-
-        if self.is_compatible(other):
-            return q - self.quantity
-        else:
-            raise IncompatibleUnits(
-                from_unit=self.units_str,
-                to_unit=str(other.units),
-            )
-
     # ========================================================================================================= MUTATORS
-    def to(self, unit: str | Datum.ureg.Unit, in_place: bool = False) -> Optional[Datum]:
+    def to(self, units: str | Unit) -> Datum:
+        Datum._validate_type('units', units)
+
         try:
-            new_q = self.quantity.to(unit)
-            if in_place:
-                self._magnitude = new_q.magnitude
-                self._units = new_q.units
-            else:
-                return Datum.from_quantity(self.symbol, new_q)
+            new_q = self.quantity.to(units)
+            return Datum.from_quantity(self.symbol, new_q)
+
         except DimensionalityError as e:
-            raise IncompatibleUnits(from_unit=self.units_str, to_unit=unit) from e
+            raise IncompatibleUnits(from_unit=self.units_str, to_unit=units) from e
 
-    def ito(self, unit: str | Datum.ureg.Unit) -> None:
-        self.to(unit, in_place=True)
+    def to_base_units(self) -> Datum:
+        return self.to(self.base.units)
 
-    def to_base_units(self, in_place: bool = False) -> Optional[Datum]:
-        return self.to(self.base_units_str, in_place=in_place)
-
-    def ito_base_units(self) -> None:
-        self.to(self.base_units, in_place=True)
-
-    def scale(self, factor: float|int, in_place: bool = False) -> Optional[Datum]:
+    def scale(self, factor: float|int) -> Datum:
         if not isinstance(factor, (float, int)):
             raise TypeError(f'Expected float or int, got "{type(factor)}".')
 
-        if in_place:
-            self._magnitude = factor * self.magnitude
-            return None
-        else:
-            return Datum(self.symbol, self.magnitude * factor, self.units_str)
-
-    def iscale(self, factor: float|int) -> None:
-        self.scale(factor, in_place=True)
-
-    def pow(self, power: float|int) -> Quantity:
-        q = self.quantity
-        return q ** power
+        return Datum(self.symbol, self.magnitude * factor, self.units_str)
 
 
     # ====================================================================================================== NORMALIZERS
-    @staticmethod
-    def normalize_units(u: str|Unit|Quantity) -> Unit|Quantity:
-        if isinstance(u, (str, Unit)):
-            return Datum.ureg.Unit(u)
+    @classmethod
+    def normalize_units(cls, u: str|Unit) -> Unit:
+        cls._validate_type('units', u)
 
-        elif isinstance(u, Quantity):
-            units = Datum.normalize_units(u.units)
-            return u.magnitude * units
+        try:
+            return cls.ureg.Unit(u)
 
-        else:
-            raise TypeError(f'Cannot normalize units of {type(u)}')
+        except AssertionError:
+            raise ValueError(f'The units given for that Datum definition string is an invalid string: "{u}".')
+
+        except (UndefinedUnitError, ValueError):
+            raise ValueError(f'The units given for that Datum definition string cannot be parsed into pint.Unit: "{u}".')
 
     # =================================================================================================== DATUM ANALYSIS
-    @staticmethod
-    def get_decimals(value: float|int|str) -> int:
-        """
-        Returns a number of decimal places in the provided float number. Works only if the number is not a zero.
-        For example, returns 3 for 0.001 and 1 for 0.1. Also returns 0 for integers.
-        """
-
-        # the isinstance(value, bool) checks are needed because Python replaces
-        # ints and floats with bools automatically
-        if isinstance(value, int) and not isinstance(value, bool):
-            return 0
-
-        elif value == 0.0 and not isinstance(value, bool):
-            raise ValueError('Cannot determine significant digits. Choose a non-zero magnitude.')
-
-        if isinstance(value, float):
-            str_value = str(float(value))  # to quickly check for e-notation instead of 10**2 or 10^2
-            if int(value) == value:  # i.e. if it is an integer or a whole number, e.g. 2.0 or 10.0
-                return 0
-
-        elif isinstance(value, str):
-            str_value = str(float(value))
-            if '.' not in value:
-                return 0  # because we then expect it to be an integer
-                # placed after convertion to float to check that the string is truly a number, not a random 'huh'
-
-        else:
-            raise TypeError(f'Expected "float" or "str", got "{type(value)}".')
-
-        if 'e' in str_value:
-            decimals = str_value.split('e')[1][1:]  # to account for both e+ and e-
-            return int(decimals)
-        else:
-            decimals = str_value.split('.')[1]
-            return len(decimals)
+    def get_decimals(self) -> int:
+        return self.dds.num_decimals
 
     def is_compatible(self, other: Datum|Quantity|str|Unit) -> bool:
         """Checks whether the self Datum instance has compatible units with "other" object which encodes units."""
 
         if isinstance(other, (Datum, Quantity)):
-            q = self._get_quantity(other)
-            return self.units.is_compatible_with(q)
+            u = Datum.normalize_units(other.units)
+
         elif isinstance(other, (str, Unit)):
-            return self.units.is_compatible_with(other)
+            u = Datum.normalize_units(other)
+
         else:
-            raise TypeError(f'Expected "Datum", "pint.Quantity", "str", or "Datum.ureg.Unit", got "{type(other)}"')
+            raise TypeError(f'Expected "Datum", "pint.Quantity", "str", or "pint.Unit", got "{type(other)}"')
 
-
-    # ================================================================================================== PRIVATE HELPERS
-    @staticmethod
-    def _sympy_symbol_check(symbol: str) -> bool:
-        try:
-            parse_expr(f'{symbol} - 1')
-        except TypeError:
-            return False
-        return True
-
-    @staticmethod
-    def _symbol_forbidden(symbol: str) -> bool:
-        """Returns True if the symbol is forbidden, False otherwise."""
-        s = symbol.strip(' ')
-        return s in Datum._FORBIDDEN_SYMBOLS
-
-    @staticmethod
-    def _get_quantity(d: Datum|Quantity) -> Quantity:
-        if isinstance(d, Datum):
-            return Datum.normalize_units(d.quantity)
-        elif isinstance(d, Quantity):
-            return Datum.normalize_units(d)
-        else:
-            raise TypeError(f'Expected Datum or pint.Quantity, got "{type(d)}".')
+        return self.units.is_compatible_with(u)
 
 
     # ======================================================================================================= PROPERTIES
     @property
     def quantity(self) -> Quantity:
-        return self.magnitude * self.units
+        return Quantity(self.magnitude, self.units)
 
     @property
     def symbol(self) -> str:
         return self._symbol
-
-    @property
-    def sp_symbol(self) -> Symbol:
-        return Symbol(self.symbol)
 
     @property
     def magnitude(self) -> float|int:
@@ -356,15 +258,11 @@ class Datum:
         return str(self.units)
 
     @property
-    def base_quantity(self) -> Quantity:
-        return self.quantity.to_base_units()
+    def base(self) -> Datum:
+        q = self.quantity.to_base_units()
+        d = Datum(self.symbol, q.magnitude, q.units)
+        return d
 
     @property
-    def base_units(self) -> Unit:
-        bq = self.base_quantity
-        bu = bq.units
-        return bu
-
-    @property
-    def base_units_str(self) -> str:
-        return str(self.base_units)
+    def dds(self) -> DatumDefString:
+        return self._dds

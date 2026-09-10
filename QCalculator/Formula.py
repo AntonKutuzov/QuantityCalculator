@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from QCalculator.Exceptions.DatumExceptions import InvalidDatumDefString
 from QCalculator.Exceptions.FormulaExceptions import (
     RewritingError, IncompatibleUnitsError, InvalidSymbol,
     ConsistencyError, EquationNotSolvable, FailedConsistencyCheck,
@@ -7,7 +8,8 @@ from QCalculator.Exceptions.FormulaExceptions import (
 )
 from QCalculator import Datum
 
-from typing import Dict, Optional, List, overload, Set, Iterable
+from collections.abc import Collection
+from typing import Dict, Optional, List, overload, Set, Tuple
 from pint import Unit
 from sympy import parse_expr, Eq, solve, Float, simplify, im, Symbol, Number
 from copy import deepcopy, copy
@@ -31,7 +33,7 @@ class Formula:
         >>> f.write('s = 4.8 m', 'v = 0.0965 m/s')
         >>> f.target = 't = 0.01 second'
         >>> t = f.solve()  # returns a list of Datum instances
-        >>> print(*t)
+        >>> print(*t.values())
         t = 49.74 second
     """
 
@@ -44,7 +46,7 @@ class Formula:
     NO_FILTER = lambda l: l
 
 
-    def __init__(self, eq: str, ref_units: Optional[Dict[str, str|Unit]] = None):
+    def __init__(self, eq: str, ref_units: Optional[Dict[str|Tuple, str|Unit]] = None):
         """
         Accepts a string that can be parsed as a sympy expression. Optionally accepts the reference units dict that is
         used to control the units of a Datum that is written with .write(). In the case the units are not compatible,
@@ -55,7 +57,20 @@ class Formula:
         """
 
         self._eq = self._as_sympy_eq(eq)
-        self._ref_units = self._complete_ref_units(ref_units) if ref_units is not None else None
+
+        all_symbols_fine = [self._confirm_symbol(str(s)) for s in self.symbols]
+        if not all(all_symbols_fine):
+            raise InvalidDatumDefString(
+                string=self.eq_str,
+                details='One or more symbols in that expression cannot be used as Datum variable.'
+            )
+
+        if ref_units is not None:
+            expanded_unit_dict = Formula._expand_unit_dict(ref_units)
+            self._ref_units = self._complete_units(expanded_unit_dict)
+        else:
+            self._ref_units = None
+
         self._data: Dict[str, Datum] = dict()
 
         self._target: Optional[Datum] = None
@@ -84,10 +99,9 @@ class Formula:
     def __hash__(self) -> int:
         return hash(self.eq_str)
 
-    @staticmethod
-    def _as_sympy_eq(expr: str, _evaluate: bool = False) -> Eq:
+    def _as_sympy_eq(self, expr: str, _evaluate: bool = False) -> Eq:
         """
-        Prases an expression from the user to a sympy Equality
+        Parses an expression from the user to a sympy Equality
 
         :param expr:
         :return:
@@ -99,7 +113,7 @@ class Formula:
             try:
                 lhs = parse_expr(lhs)
                 rhs = parse_expr(rhs)
-            except TypeError:
+            except ValueError:
                 raise InvalidSymbol(expr=expr)
 
             eq = Eq(lhs, rhs, evaluate=_evaluate)
@@ -108,27 +122,51 @@ class Formula:
         
         return eq
 
-    def _complete_ref_units(self, ru: Dict[str, str|Unit]) -> Dict[str, Optional[str]]:
+    @staticmethod
+    def _expand_unit_dict(d: Dict[str|Tuple: str|Unit]) -> Dict[str, str|Unit]:
+        ref_units = dict()
+
+        for t, u in d.items():
+            if isinstance(t, tuple):
+                for v in t:
+                    if not isinstance(v, str):
+                        raise TypeError(f'Expected "str", got "{type(v)}".')
+                    else:
+                        ref_units[v] = u
+
+            elif isinstance(t, str):
+                ref_units[t] = u
+
+            else:
+                raise TypeError(f'Expected "str" or "Tuple[str]", got "{type(t)}".')
+
+        return ref_units
+
+    def _complete_units(self, ref_u: Dict[str, str | Unit]) -> Dict[str, Optional[str]]:
         """
         Adds None to variables for which user did not specify values.
 
-        :param ru:
+        :param ref_u:
         :return:
         """
 
         unit_dict: Dict[str, Optional[str]] = dict()
 
-        for v, u in ru.copy().items():  # in case we pass a dict for many Formulas at once (see LinearIterator)
-            if u is not None:
-                Datum.normalize_units(u)  # to raise pint.UndefinedUnitError if arbitrary string is passed as a unit
-            if v in self.symbols:
-                unit_dict.update({v : u})
+        for v, u in ref_u.items():  # in case we pass a dict for many Formulas at once (see LinearIterator)
             if u is None:
                 raise NoneReferenceUnits(formula=self.eq_str, var=v)
+            else:
+                Datum.normalize_units(u)  # raises pint.UndefinedUnitError if arbitrary string is passed as a units
+            if v in self.symbols:
+                unit_dict[v] = u
 
         for s in self.symbols:
             if s not in unit_dict.keys():
-                raise NoneReferenceUnits(formula=self.eq_str, var=s)
+                raise SymbolNotFound(
+                    formula=self.eq_str,
+                    symbol=s,
+                    details=f'Could not find symbol "{s}" in the reference units dict.'
+                )
 
         return unit_dict
 
@@ -149,7 +187,12 @@ class Formula:
         else:
             return res
 
-    def _confirm_units(self, symbol: str, units: Optional[str|Unit] = None, raise_exception: bool = True) -> bool:
+    def _confirm_units(
+            self,
+            symbol: str,
+            units: Optional[str|Unit] = None,
+            raise_exception: bool = True
+    ) -> bool:
         """
         Compares the units of a variable to the reference units specified at the initialization step. Returns True
         if "units" is None (for default values in read() and write() methods).
@@ -231,10 +274,11 @@ class Formula:
                         details='To enable rewriting set the "rewrite" parameter to True.'
                     )
 
-            self._data.update({datum.symbol : datum})
+            self._data[datum.symbol] = datum
+
             if not self.consistency_check(silent_failure=True, raise_exception=False) and not force_inconsistent:
                 self._data = old_data  # in case this exception is caught and the code runs further, we remove any changes
-                raise ConsistencyError(formula=self.eq_str, details=f'The last value to write was "{str(datum)}".')
+                raise ConsistencyError(formula=self.eq_str, details=f'The changes were not applied.')
 
     @overload
     def read(self, var: str, units: Optional[str|Unit] = None) -> Datum:
@@ -246,8 +290,8 @@ class Formula:
 
     def read(
             self,
-            var: str | List[str],
-            units: Optional[str | Unit | List[str|Unit]] = None
+            var: str | Collection[str],
+            units: Optional[str | Unit | Collection[str|Unit]] = None
     ) -> Datum | List[Datum]:
         """
         Returns a (list of) Datum instance with the specified symbol. If no value is found, the NoValueError is raised.
@@ -273,7 +317,7 @@ class Formula:
             else:
                 raise NoValueError(formula=self.eq_str, symbol=var)
 
-        elif isinstance(var, list):
+        elif isinstance(var, Collection):
             if units is not None and not len(var) == len(units):
                 raise ValueError('The lengths of "var" and "units" lists must be the same, or the "units" parameter must be None.')
             elif units is None:
@@ -288,7 +332,7 @@ class Formula:
             return datum_list
 
         else:
-            raise TypeError("The read() method accepts either one variable or list of variables. Same for units.")
+            raise TypeError("The read() method accepts either one variable or list of variables. The units list must be of the same size as the variable list.")
 
     def erase(self, var: Optional[str] = None) -> None:
         if var is not None:
@@ -332,7 +376,6 @@ class Formula:
 
             close = isclose(rhs, lhs, rel_tol=1e-12, abs_tol=1e-15)
             # 15 digits are the last digit not affected by operations with float in Python (abs_tol).
-            # one of the sides is always zero due to the standard way of writing equations in Formula.
 
             if not close and raise_exception:
                 raise ConsistencyError(formula=self.eq_str)
@@ -354,7 +397,7 @@ class Formula:
     def has_value(self, var: List[str]) -> List[bool]:
         ...
 
-    def has_value(self, var: str | Iterable[str]) -> bool | List[bool]:
+    def has_value(self, var: str | Collection[str]) -> bool | List[bool]:
         """
         Checks that the specified variable(s) has a value. Raises OverlappingVariables exception if there is more than
         one variable with the same symbol.
@@ -370,7 +413,7 @@ class Formula:
             return ds is not None
 
 
-        elif isinstance(var, (list, tuple, set)):
+        elif isinstance(var, Collection):
             res_list = list()
             for v in var:
                 res_list.append(self.has_value(v))
@@ -380,16 +423,41 @@ class Formula:
             raise TypeError(f'The "has_value" method expects either a string or a list of strings, got: "{type(var)}".')
 
     # ===================================================================================================== COMPUTATIONS
-    def eval(
-            self,
-            *filters,
-            symbolic: bool = False
-    ) -> Set[Eq] | Set[Float]:
+    def eval_symbolic(self) -> List[Eq]:
         """
-        Evaluates the expression by using sympy solve() function. If "symbolic" is set to True, the result is a list of
-        Equality instances with the target variable expressed in terms of all the other variables. If "symbolic" is
-        False, the available values are substituted for variables and the resulting expression is returned. If all
-        variables have a value, sp.Float is returned.
+        Rearranges the expressions to the form "target = rest" by using sympy solve(). Does not substitute the variables'
+        values. Returns a sympy Eq instance or list of instances (for non-linear equations).
+
+        Example
+        ----------
+            >>> f = Formula('s = v * t')
+            >>> f.write('s = 4.8 m', 'v = 0.0965 m/s')
+            >>> f.target = 't = 0.01 second'
+            >>> f.eval_symbolic()
+            [Eq(t, s/v)]
+
+        :return:
+        """
+
+        if self.target is None:
+            raise TargetNotFound(formula=self.eq_str)
+        self.consistency_check(silent_failure=True)
+        self._confirm_symbol(self.target.symbol)
+        self._confirm_units(self.target.units)
+
+        sols = solve(self.eq, self.target.symbol)
+
+        res = list()
+        t = Symbol(self.target.symbol)
+        for s in sols:
+            eq = Eq(t, s, evaluate=False)
+            res.append(eq)
+        return res
+
+    def eval_numeric(self, *filters) -> List[Eq] | List[Float]:
+        """
+        Evaluates the expression by using sympy solve() function. The available values are substituted for variables and
+        the resulting expression is returned. If all variables have a value, sp.Float is returned.
 
         The "filters" parameters specify which solutions to keep and which to ignore. On a class level several pre-set
         filters are defined (such as REAL_ONLY, POSITIVES, ...). Each filter is passed to the standard Python's filter()
@@ -398,75 +466,58 @@ class Formula:
         Example
         ----------
             >>> from QCalculator import Formula
-            >>> f = Formula('s = v * t')
-            >>> f.write('s = 4.8 m', 'v = 0.0965 m/s')
-            >>> f.target = 't = 0.01 second'
-            >>> f.eval(symbolic=True)
-            [Eq(t, s/v)]
-            >>> f1 = Formula('x**2 + 5*x + 6')
+            >>> f1 = Formula('x**2 + 5*x + 6 = 0')
             >>> f1.target = 'x = 0.001'
-            >>> f1.eval(Formula.POSITIVES)
+            >>> f1.eval_numeric(Formula.POSITIVES)
             []
-            >>> f1.eval(Formula.NEGATIVES)
-            [-3, -2]
-
+            >>> f1.eval_numeric(Formula.NEGATIVES)
+            [-3.0, -2.0]
 
         :param filters: function to be passed to the filter() Python function to sort solutions from sympy solve
-        :param symbolic: if True, the function returns an Equality instance without substituting variable values
         :return: list of either sympy Equality or sympy Float (if the solution can be found)
         """
 
+        # run all necessary checks
         if self.target is None:
             raise TargetNotFound(formula=self.eq_str)
-
         self.consistency_check(silent_failure=True)
         self._confirm_symbol(self.target.symbol)
         self._confirm_units(self.target.units)
 
-        vd = self._value_dict()
-
-        if not symbolic:
-            if self.has_value(self.target.symbol):
-                tbu = self.read(self.target.symbol, self.target.base_units)
-                return {Float(tbu.magnitude)}
-            else:
-                eq = self.eq.subs(vd)
+        # if the value is already written, just return it
+        if self.has_value(self.target.symbol):
+            v = self.read(self.target.symbol, self.target.base_units)
+            return [Float(v.magnitude)]
         else:
-            eq = self.eq
+            vd = self._value_dict()
+            eq = self.eq.subs(vd)
 
-        sols = solve(eq, self.target.symbol)
-        native_sols = set([float(s) if isinstance(s, Number) else s for s in sols])
+            sols = solve(eq, self.target.symbol)
 
-        if symbolic:
-            res = set()
-            for s in native_sols:
-                t = Symbol(self.target.symbol)
-                eq = Eq(t, s, evaluate=False)
-                res.add(eq)
-            native_sols = res
-        else:
+            native_sols = [(float(s) if isinstance(s, Number) else s) for s in sols]
+
             for fil in filters:
-                native_sols = set(filter(fil, native_sols))
+                native_sols = list(filter(fil, native_sols))
 
-        return native_sols
-
+            return native_sols
 
     def solve(
             self,
             *filters,
             rounding: bool = True,
-            round_to: int = 2
+            round_target: int = 2
     ) -> Dict[str, Datum]:
         """
-        The solve() method wraps eval() method since often Formula is used to solve equations that yield real
+        The solve() method wraps eval methods since often Formula is used to solve equations that yield real
         value which are compatible with the Datum class (imaginary or complex numbers are not). solve() also does
         rounding of the result if "rounding" parameter is set to True. The function rounds to the number of significant
         digits specified in the Datum definition string of the target variable (specified via .target setter).
 
         The solve() method can be used without specifying the target, because solve() only solves the equations, not
         evaluates them symbolically. That is, the .unknown property is used to automatically determine the target. In
-        this case the "round_to" parameter is used to specify to what number of significant digits the final value
-        must be rounded. "round_to" is ignored if "rounding" is set to False.
+        this case the "round_target" parameter is used to specify to what number of significant digits the final value
+        must be rounded. "round_target" is ignored if "rounding" is set to False or if the "target" attribute of Formula
+        instance is not None.
 
         **NOTE**: if all the variables have a value, the UnknownNotFound error will be raised regardless of whether the
         target is specified.
@@ -475,7 +526,7 @@ class Formula:
 
         :param filters: function to sort solutions passed directly to the eval() method used
         :param rounding: if True, the solution(s) will be rounded to the specified number of significant digits
-        :param round_to: specifies number of significant digits for rounding if target is not specified
+        :param round_target: specifies number of significant digits for rounding if target is not specified
         :return: list of Datum instances
         """
 
@@ -486,16 +537,16 @@ class Formula:
         if self.target is None:
             NONE_TARGET = True
             if self._ref_units is None:
-                raise Exception('Specify either target or reference units to solve equations without specifying target variable.')
-            value = round(0.111111111111111, round_to)
+                raise TargetNotFound(formula=self.eq_str, details='Specify either target or reference units to solve equations without specifying target variable.')
+            value = round(0.111111111111111, round_target)
             self.target = Datum(unk, value, self._ref_units[unk])
         else:
             NONE_TARGET = False
 
-        # "sols" can only be a float number since we solve with "symbloic=False", we checked for equation being solvable
+        # "sols" can only be a float number since we solve with "symbolic=False", we checked for equation being solvable,
         # and we filter for real numbers.
         # NOTE: filters must be directly passed to the eval() method. The tests do not account for filters in solve().
-        sols: Set[Float] = self.eval(Formula.REAL_ONLY, *filters)
+        sols: List[Float] = self.eval_numeric(Formula.REAL_ONLY, *filters)
 
         res = dict()
 
@@ -509,7 +560,7 @@ class Formula:
                 mag = round(d.magnitude, Datum.get_decimals(self.target.magnitude))
                 d = Datum(self.target.symbol, mag, self.target.units)
 
-            res.update({d.symbol : d})
+            res[d.symbol] = d
 
         if NONE_TARGET:
             self._target = None
@@ -543,14 +594,14 @@ class Formula:
         :return:
         """
 
-        values = self.has_value(list(self.symbols))
+        values = self.has_value(self.symbols)
         nones = [v for v in values if v is False]  # count Falses. If there's one value missing, the equation can be solved
         return len(nones) <= 1
 
     @property
     def all_values(self) -> bool:
         """returns True if all values are already present in the Formula"""
-        return len(self._data) == len(self.symbols)  # because we control for each var having no more than one value
+        return len(self.data) == len(self.symbols)  # because we control for each var having no more than one value
 
     @property
     def unknown(self) -> str:
@@ -573,7 +624,7 @@ class Formula:
 
     @property
     def data(self) -> Dict[str, Datum]:
-        """Returns a **deepcopy** of the data set where the written Datum instances are stored"""
+        """Returns a **deepcopy** of the data dict where the written Datum instances are stored"""
         return deepcopy(self._data)
 
     @property
@@ -592,14 +643,15 @@ class Formula:
     @property
     def target(self) -> Datum:
         """
-        Returns a Datum instance defining the target variable, return units and the number of decimal places for
-        founding of the target when it is found.
+        Returns a Datum instance defining the target variable, returned units and the number of decimal places are used
+        as return units and rounding (if enabled) when solving for the target with solve().
         """
 
-        return self._target
+        return copy(self._target)
 
     @target.setter
     def target(self, datum: Datum|str) -> None:
+        # checks for the type, correctness of string or symbol
         d = Datum.as_datum(datum)
 
         self._confirm_symbol(d.symbol)
