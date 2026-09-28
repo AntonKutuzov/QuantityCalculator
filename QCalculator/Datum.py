@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from pint import UnitRegistry, Quantity, Unit, DimensionalityError, UndefinedUnitError
-from typing import Any, Literal
 from sympy.parsing.sympy_parser import parse_expr
+from math import isnan, isinf
 
 from QCalculator.Exceptions.DatumExceptions import (
     IncompatibleUnits,
     InvalidVarName, UndefinedUnit
 )
 from QCalculator.DatumDefString import DatumDefString
+from QCalculator._util import validate_type
 
 
 class Datum:
@@ -16,60 +17,37 @@ class Datum:
 
     def __init__(self, dds: str, *, sympy_safe: bool = True) -> None:
         self._dds = DatumDefString(dds)
+
+        if not isinstance(sympy_safe, bool):
+            raise TypeError(f'Expected "bool", got: "{type(sympy_safe)}".')
+
         self._sympy_safe = sympy_safe
 
-        self._confirm_symbol(self.dds.variable)
+        self._check_sympy_safety(self.dds.variable)
+
+
+    # ========================================================================================= ALTERNATIVE CONSTRUCTORS
+    @classmethod
+    def from_quantity(cls, var: str, q: Quantity, *, sympy_safe: bool = True) -> Datum:
+        validate_type(var, str)
+        validate_type(q, Quantity)
+        validate_type(sympy_safe, bool)
+
+        return Datum(f'{var} = {q.magnitude} {q.units}', sympy_safe=sympy_safe)
+
 
     # ================================================================================================== PRIVATE HELPERS
-    def _confirm_symbol(self, symbol: str) -> None:
+    def _check_sympy_safety(self, symbol: str) -> None:
         if self._sympy_safe:
             try:
                 parse_expr(f'{symbol} - 1')
             except TypeError as e:
                 raise InvalidVarName(
                     var=symbol,
-                    details=f'The symbol "{symbol}" cannot be used in sympy expressions.'
+                    details=f'The symbol "{symbol}" cannot be used in sympy expressions.\nTo ignore, set "sympy_safe" to True in constructor.'
                 ) from e
         else:
             return None
-
-    @staticmethod
-    def _validate_type(check_for: Literal['variable', 'magnitude', 'units'], var: Any) -> None:
-        symbol_types = (str,)
-        magnitude_types = (float, int)
-        magnitude_forbidden = (bool,)
-        units_types = (str, Unit)
-
-        check_types = tuple()
-        avoid = tuple()
-
-        match check_for:
-            case 'variable':
-                check_types = symbol_types
-                avoid = tuple()
-            case 'magnitude':
-                check_types = magnitude_types
-                avoid = magnitude_forbidden
-            case 'units':
-                check_types = units_types
-                avoid = tuple()
-            case _:
-                raise ValueError(f'The "check_for" parameter must be a string "symbol", "magnitude", or "units", got: "{check_for}" or type "{type(check_for)}".')
-
-        if isinstance(var, check_types) and not isinstance(var, avoid):
-            return
-        else:
-            raise TypeError(f'The attribute "{check_for}" must be of types "{check_types}", got: {type(var)}.')
-
-    # ========================================================================================= ALTERNATIVE CONSTRUCTORS
-    @classmethod
-    def from_quantity(cls, var: str, q: Quantity, *, sympy_safe: bool = True) -> Datum:
-        cls._validate_type('variable', var)
-
-        if not isinstance(q, Quantity):
-            raise TypeError(f'Expected "pint.Quantity", got: "{type(q)}".')
-
-        return Datum(f'{var} = {q.magnitude} {q.units}', sympy_safe=sympy_safe)
 
 
     # ==================================================================================================== MAGIC METHODS
@@ -90,8 +68,8 @@ class Datum:
         from math import isclose
 
         conditions = [
-            self.units == other.units,
-            isclose(self.value, self.value),
+            self.units == self.ureg.Unit(other.units),
+            isclose(self.value, other.value),
             self.variable == other.variable
         ]
 
@@ -99,7 +77,8 @@ class Datum:
 
     # ========================================================================================================= MUTATORS
     def to(self, units: str | Unit) -> Datum:
-        Datum._validate_type('units', units)
+        validate_type(units, (str, Unit))
+        DatumDefString.check_unit_validity(units)
 
         try:
             new_q = self.quantity.to(units)
@@ -110,8 +89,10 @@ class Datum:
         return Datum.from_quantity(self.variable, new_q)
 
     def scale(self, factor: float|int) -> Datum:
-        if not isinstance(factor, (float, int)):
-            raise TypeError(f'Expected float or int, got "{type(factor)}".')
+        validate_type(factor, (float, int))
+
+        if isnan(factor) or isinf(factor):
+            raise ValueError('"factor" must be a real number.')
 
         return Datum.from_quantity(self.variable, factor * self.quantity, sympy_safe=self._sympy_safe)
 
@@ -119,7 +100,7 @@ class Datum:
     # ====================================================================================================== NORMALIZERS
     @classmethod
     def _normalize_units(cls, u: str | Unit) -> Unit:
-        cls._validate_type('units', u)
+        validate_type(u, (str, Unit))
         DatumDefString.check_unit_validity(u)
 
         try:

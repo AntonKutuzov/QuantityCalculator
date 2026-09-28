@@ -34,8 +34,9 @@ class DatumDefString(str):
     _units = compile(_units_str)
     _dds = compile(_dds_str)
 
-    _PATTERNS = namedtuple('strings', 'symbol, subscript, variable, whole, decimal, value, units, dds')
+    _PATTERNS = namedtuple('_PATTERNS', 'symbol, subscript, variable, whole, decimal, value, units, dds')
     patterns = _PATTERNS(_symbol, _subscript, _variable, _whole, _decimal, _value, _units, _dds)
+    strings = _PATTERNS(_symbol_str, _subscript_str, _variable_str, _whole_str, _decimal_str, _variable_str, _units_str, _dds_str)
 
 
     def __init__(self, dds: str) -> None:
@@ -50,6 +51,7 @@ class DatumDefString(str):
             self._string = dds
 
         self.check_unit_validity(self.units)
+
 
     def __str__(self):
         return self.string
@@ -148,12 +150,15 @@ class DatumDefString(str):
 
     @property
     def string(self) -> str:
-        return f'{self.variable} = {self.value} {self.units}'
+        u = self.ureg.parse_units(self.units)
+        u = str(u)
+
+        return f'{self.variable} = {self.value} {u}'
 
 
     @property
     def raw_string(self) -> str:
-        return str(self._string)
+        return self._string
 
 
 if __name__ == '__main__':
