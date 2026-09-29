@@ -36,7 +36,7 @@ class DatumDefString(str):
 
     _PATTERNS = namedtuple('_PATTERNS', 'symbol, subscript, variable, whole, decimal, value, units, dds')
     patterns = _PATTERNS(_symbol, _subscript, _variable, _whole, _decimal, _value, _units, _dds)
-    strings = _PATTERNS(_symbol_str, _subscript_str, _variable_str, _whole_str, _decimal_str, _variable_str, _units_str, _dds_str)
+    strings = _PATTERNS(_symbol_str, _subscript_str, _variable_str, _whole_str, _decimal_str, _value_str, _units_str, _dds_str)
 
 
     def __init__(self, dds: str) -> None:
