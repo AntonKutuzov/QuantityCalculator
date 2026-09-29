@@ -40,17 +40,18 @@ class DatumDefString(str):
 
 
     def __init__(self, dds: str) -> None:
-        if not isinstance(dds, str):
-            raise InvalidDatumDefString(f'Datum definition string must be of type str, got: "{type(dds)}".')
+        if isinstance(dds, str):
+            match = DatumDefString._dds.fullmatch(dds)
+            if match is None:
+                raise InvalidDatumDefString(dds)
+            else:
+                self._dds = match
+                self._string = dds
 
-        match = DatumDefString._dds.fullmatch(dds)
-        if match is None:
-            raise InvalidDatumDefString(dds)
+            self.check_unit_validity(self.units)
+
         else:
-            self._dds = match
-            self._string = dds
-
-        self.check_unit_validity(self.units)
+            raise TypeError(f'Datum definition string must be of type str, got: "{type(dds)}".')
 
 
     def __str__(self):
