@@ -32,16 +32,16 @@ class DatumDefString(str):
     _decimal = compile(_decimal_str)
     _value = compile(_value_str)
     _units = compile(_units_str)
-    _dds = compile(_dds_str)
+    _datumdefstring = compile(_dds_str)  # because _dds is instance's internal attribute
 
     _PATTERNS = namedtuple('_PATTERNS', 'symbol, subscript, variable, whole, decimal, value, units, dds')
-    patterns = _PATTERNS(_symbol, _subscript, _variable, _whole, _decimal, _value, _units, _dds)
+    patterns = _PATTERNS(_symbol, _subscript, _variable, _whole, _decimal, _value, _units, _datumdefstring)
     strings = _PATTERNS(_symbol_str, _subscript_str, _variable_str, _whole_str, _decimal_str, _value_str, _units_str, _dds_str)
 
 
     def __init__(self, dds: str) -> None:
         if isinstance(dds, str):
-            match = DatumDefString._dds.fullmatch(dds)
+            match = DatumDefString.patterns.dds.fullmatch(dds)
             if match is None:
                 raise InvalidDatumDefString(dds)
             else:
