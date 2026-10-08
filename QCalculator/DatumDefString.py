@@ -3,6 +3,7 @@ from pint.errors import UndefinedUnitError
 from typing import Literal
 from collections import  namedtuple
 
+from QCalculator import DEF_UR
 from QCalculator.Exceptions.DatumExceptions import (
     InvalidDatumDefString,
     InvalidUnitExpression,
@@ -13,7 +14,7 @@ from QCalculator.Exceptions.DatumExceptions import (
 class DatumDefString(str):
     from re import compile
 
-    ureg = UnitRegistry(system='SI')
+    ureg = DEF_UR
 
     _symbol_str = r'(?P<symbol>[a-z]|[A-Z]+)'
     _subscript_str = r'(?P<sub>[a-zA-Z0-9]+)'

@@ -4,6 +4,7 @@ from pint import UnitRegistry, Quantity, Unit, DimensionalityError, UndefinedUni
 from sympy.parsing.sympy_parser import parse_expr
 from math import isnan, isinf
 
+from QCalculator import DEF_UR
 from QCalculator.Exceptions.DatumExceptions import (
     IncompatibleUnits,
     InvalidVarName, UndefinedUnit
@@ -13,7 +14,7 @@ from QCalculator._util import validate_type
 
 
 class Datum:
-    ureg = UnitRegistry(system='SI')
+    ureg = DEF_UR
 
     def __init__(self, dds: str, *, sympy_safe: bool = True) -> None:
         self._dds = DatumDefString(dds)

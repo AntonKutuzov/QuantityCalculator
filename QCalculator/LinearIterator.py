@@ -43,7 +43,7 @@ class LinearIterator:
 
         for old_f in f:
             if isinstance(old_f, str):
-                new_f = Formula(old_f, ref_units=u)
+                new_f = Formula(old_f, def_units=u)
 
                 fs.add(new_f)
             else:
@@ -52,7 +52,7 @@ class LinearIterator:
         return fs
 
     def _confirm_symbol(self, var: str, raise_exception: bool = True) -> bool:
-        if not Datum._confirm_symbol(var, raise_exception=False):
+        if not Datum._check_sympy_safety(var, raise_exception=False):
             raise InvalidDatumDefString(string=var, details=f'The symbol "{var}" cannot be used.')
 
         for f in self.formulas:
