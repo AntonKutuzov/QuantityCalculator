@@ -1,4 +1,4 @@
-from pint import UnitRegistry, Unit
+from pint import Unit
 from pint.errors import UndefinedUnitError
 from typing import Literal
 from collections import  namedtuple

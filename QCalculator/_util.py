@@ -1,4 +1,4 @@
-from typing import Any, Tuple, Match, Literal
+from typing import Any, Tuple, Match, Literal, Optional, Pattern
 from QCalculator import DatumDefString
 
 
@@ -18,22 +18,35 @@ def validate_match(m: Match, match_str: str, pattern: str) -> None:
 
 
 def must_match(
-        pattern: Literal['symbol', 'variable', 'dds'],
-        string: str
+        pattern: Literal['symbol', 'variable', 'dds', 'other'],
+        string: str,
+        custom_pattern: Optional[Pattern] = None
 ) -> Match:
     m = None
+    p: Pattern
 
     match pattern:
         case 'symbol':
-            m = DatumDefString.patterns.symbol.fullmatch(string)
+            p = DatumDefString.patterns.symbol
+            # m = DatumDefString.patterns.symbol.fullmatch(string)
         case 'variable':
-            m = DatumDefString.patterns.variable.fullmatch(string)
+            p = DatumDefString.patterns.variable
+            # m = DatumDefString.patterns.variable.fullmatch(string)
         case 'dds':
-            m = DatumDefString.patterns.dds.fullmatch(string)
+            p = DatumDefString.patterns.dds
+            # m = DatumDefString.patterns.dds.fullmatch(string)
+        case 'other':
+            if custom_pattern is not None:
+                p = custom_pattern
+                # m = custom_pattern.fullmatch(string)
+            else:
+                raise ValueError(f'The pattern "{pattern}" is not supported.')
         case _:
             raise ValueError(f'The pattern "{pattern}" is not supported.')
 
+    m = p.fullmatch(string)  # I don't see how it might be referenced before assignment
+
     if m is None:
-        raise ValueError(f'The string "{string}" does not match the "{pattern}" pattern.')
+        raise ValueError(f'The string "{string}" does not match the "{pattern}" pattern.\nThe pattern: "{p.pattern}"')
     else:
         return m
