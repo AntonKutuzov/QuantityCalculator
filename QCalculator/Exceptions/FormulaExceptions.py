@@ -33,15 +33,12 @@ class IncompatibleUnitsError(ReadWriteError):
         message = f'The units "{units}" for variable "{var}" are not compatible with the reference units "{ref}".'
         super().__init__(message, details)
 
+'''
 class WrongUnitEquation(ReadWriteError):
     def __init__(self, f: str, units: Dict[str, str], details: Optional[str] = None):
         message = f'Current units ({units}) do not form an equality when substituted into an equation "{f}"'
         super().__init__(message, details)
-
-class OverlappingVariables(ReadWriteError):
-    def __init__(self, formula: str, vars: List[str], details: Optional[str] = None):
-        message = f'The formula "{formula}" has several variables with the same symbol: [{",".join(vars)}]'
-        super().__init__(message, details)
+   '''
 
 class InvalidSymbol(ReadWriteError):
     def __init__(self, expr: str, details: Optional[str] = None):
