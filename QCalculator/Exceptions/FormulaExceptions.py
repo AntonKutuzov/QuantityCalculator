@@ -4,6 +4,11 @@ from QCalculator.Exceptions import QCException
 from QCalculator.Datum import Datum
 
 
+"""
+
+"""
+
+
 class FormulaException(QCException):
     def __init__(self, message: str, details: str):
         super().__init__(message, details)

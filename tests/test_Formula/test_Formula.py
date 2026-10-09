@@ -57,7 +57,7 @@ TS = PresetData1(
 
 @pytest.fixture
 def f1():
-    return Formula('df = C1/C2', ref_units={'df':'', 'C1':'mole/L', 'C2':'mole/L'})
+    return Formula('df = C1/C2', def_units={'df': '', 'C1': 'mole/L', 'C2': 'mole/L'})
 
 @pytest.fixture
 def f2():
@@ -111,7 +111,7 @@ def f2():
 )
 def test_init_Formula(formula, equation, ref_units, symbols, exception):
     with exception_handling(exception):
-        f = Formula(formula, ref_units=ref_units)
+        f = Formula(formula, def_units=ref_units)
         assert f.eq_str == equation
         assert f._ref_units == ref_units
         assert f.symbols == symbols
@@ -122,27 +122,27 @@ def test_init_Formula(formula, equation, ref_units, symbols, exception):
     [
         # "other" units mean that they are not the same, although still may be compatible
         pytest.param(
-            Formula('df = C1/C2', ref_units={'df':'', 'C1':'mole/L', 'C2':'mole/L'}),
+            Formula('df = C1/C2', def_units={'df': '', 'C1': 'mole/L', 'C2': 'mole/L'}),
             True,
             id='normal-with-equal'
         ),
         pytest.param(
-            Formula('df = -C1/C2', ref_units={'df':'', 'C1':'mole/L', 'C2':'mole/L'}),
+            Formula('df = -C1/C2', def_units={'df': '', 'C1': 'mole/L', 'C2': 'mole/L'}),
             False,
             id='other-formula-same-units'
         ),
         pytest.param(
-            Formula('df = C1/C2', ref_units={'df': '', 'C1': 'mmole/mL', 'C2': 'mmole/mL'}),
+            Formula('df = C1/C2', def_units={'df': '', 'C1': 'mmole/mL', 'C2': 'mmole/mL'}),
             False,
             id='same-formula-other-units'
         ),
         pytest.param(
-            Formula('df = -C1/C2', ref_units={'df': '', 'C1': 'mmole/mL', 'C2': 'mmole/mL'}),
+            Formula('df = -C1/C2', def_units={'df': '', 'C1': 'mmole/mL', 'C2': 'mmole/mL'}),
             False,
             id='other-formula-other-units'
         ),
         pytest.param(
-            Formula('df = C1/C2', ref_units={'df': '', 'C1': 'mL', 'C2': 'mL'}),
+            Formula('df = C1/C2', def_units={'df': '', 'C1': 'mL', 'C2': 'mL'}),
             False,
             id='same-formula-incompatible-units'
         ),
@@ -571,7 +571,7 @@ def test_target_getter(f1):
 def test_decimals(f1, data, expected):
     f1._data = data
     print(*data)
-    assert f1.decimals == expected
+    assert f1.min_num_decimals == expected
 
 @pytest.mark.parametrize(
     "data, expected",

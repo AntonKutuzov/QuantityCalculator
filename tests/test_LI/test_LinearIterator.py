@@ -597,8 +597,8 @@ def test_solvables(li1, data):
     """
 
     expected = {
-        Formula('n = Np/NA', ref_units=units1),
-        Formula('wmm = mps/msm', ref_units=units1)
+        Formula('n = Np/NA', def_units=units1),
+        Formula('wmm = mps/msm', def_units=units1)
     }
 
     complete_data = deepcopy(data)
