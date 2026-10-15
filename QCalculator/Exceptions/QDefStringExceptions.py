@@ -34,6 +34,9 @@ class UndefinedUnit(UnitException):
     def __init__(self, cls: type, unit: str):
         super().__init__(f'The units "{unit}" are not defined in the used UnitRegistry of {cls}.')
 
+class UnitNotAllowed(UnitException):
+    def __init__(self, cls, unit: str) -> None:
+        super().__init__(f'The provided unit "{unit}" is not allowed in class {cls}.')
 
 
 

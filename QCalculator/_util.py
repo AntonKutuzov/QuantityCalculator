@@ -1,5 +1,11 @@
+from pint import UndefinedUnitError, Unit
 from typing import Any, Tuple, Match, Literal, Optional, Pattern, Dict, List, overload
 from QCalculator.DefStrings import patterns
+from QCalculator.Exceptions.QDefStringExceptions import (
+    UndefinedUnit,
+    InvalidUnitExpression
+)
+
 
 
 def validate_type(
@@ -92,3 +98,20 @@ def unpack_keys(d: Dict[Tuple[Any, ...] | Any, Any]) -> Dict[Any, Any]:
             unpacked[t] = u
 
     return unpacked
+
+
+
+def check_unit_validity(cls, unit: str | Unit) -> None:
+    if not isinstance(unit, (str, Unit)):
+        raise TypeError(f'Expected "str" or "pint.Unit", got: "{unit}".')
+
+    unit = str(unit)
+
+    try:
+        cls.ureg.parse_units(unit)
+
+    except (AssertionError, ValueError, TypeError):
+        raise InvalidUnitExpression(unit)
+
+    except UndefinedUnitError:
+        raise UndefinedUnit(cls, unit)

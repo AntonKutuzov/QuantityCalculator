@@ -6,7 +6,7 @@ from re import compile, Pattern
 from copy import deepcopy
 
 from QCalculator import DEF_UR
-from QCalculator._util import must_match, validate_type, validate_types
+from QCalculator._util import must_match, validate_type, validate_types, check_unit_validity
 from QCalculator.DefStrings.patterns import variable_str, value_str, units_str
 
 from QCalculator.Exceptions.QDefStringExceptions import (
@@ -14,7 +14,8 @@ from QCalculator.Exceptions.QDefStringExceptions import (
     InvalidUnitExpression,
     UndefinedUnit,
     InvalidQDefString,
-    VariableNotAllowed
+    VariableNotAllowed,
+    UnitNotAllowed
 )
 
 
@@ -68,6 +69,18 @@ class QDefString(str, ABC):
         if cls._restrictions['variable']:
             if var not in cls._restrictions['variable']:
                 raise VariableNotAllowed(cls, var)
+
+        if cls._restrictions['unit']:
+            unit = match.group('unit')
+            check_unit_validity(cls, unit)
+            unit = cls.ureg.parse_units(unit)
+
+            for u in cls._restrictions['unit']:
+                if unit.is_compatible_with(u):
+                    break
+            else:
+                raise UnitNotAllowed(cls, unit)
+
 
         return super().__new__(cls, string)
 
