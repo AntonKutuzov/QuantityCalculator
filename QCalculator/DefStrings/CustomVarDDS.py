@@ -2,6 +2,7 @@ from typing import Literal
 
 from QCalculator.DefStrings.QDefString import QDefString
 from QCalculator._util import unpack_keys
+from QCalculator import DEF_UR
 
 
 # PH0<variable>PH1=PH2<value>PH3<units>PH4
@@ -72,9 +73,7 @@ class CustomVarDDS(
 
     @property
     def norm_string(self) -> str:
-        u = self.ureg.parse_units(self.unit)
-        u = str(u)
-
+        u = str(self.unit)
         return f'{self.variable} = {self.value} {u}'
 
 

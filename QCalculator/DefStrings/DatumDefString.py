@@ -1,7 +1,10 @@
 from typing import Literal
 
 from QCalculator.DefStrings.CustomVarDDS import CustomVarDDS
+from QCalculator.Exceptions.DatumExceptions import InvalidDatumDefString
 from QCalculator._util import unpack_keys
+from QCalculator.Exceptions.QDefStringExceptions import InvalidQDefString
+from QCalculator import DEF_UR
 
 
 # PH0<variable>PH1=PH2<value>PH3<units>PH4
@@ -14,7 +17,14 @@ class DatumDefString(
         4: ')?'
     }))
 ):
-    pass
+    def __new__(cls, string: str, *args, **kwargs) -> object:
+        try:
+            return super().__new__(cls, string)
+        except InvalidQDefString as iqds:
+            raise InvalidDatumDefString(string) from iqds
+
+    def __init__(self, string: str):
+        super().__init__(string)
 
 
 

@@ -13,6 +13,10 @@ class CannotInstantiateQDS(QDefStringException):
 class UnitException(QDefStringException):
     ...
 
+class InvalidQDefString(QDefStringException):
+    def __init__(self, qds: str) -> None:
+        super().__init__(f'The QDefString "{qds}" does not match the base pattern.')
+
 
 class InvalidUnitExpression(UnitException):
     def __init__(self, unit: str) -> None:

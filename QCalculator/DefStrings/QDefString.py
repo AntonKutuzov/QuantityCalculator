@@ -3,6 +3,7 @@ from abc import ABC
 from pint import Unit
 from pint.errors import UndefinedUnitError
 from re import compile, Pattern
+from copy import deepcopy
 
 from QCalculator import DEF_UR
 from QCalculator._util import must_match, validate_type, validate_types
@@ -11,7 +12,8 @@ from QCalculator.DefStrings.patterns import variable_str, value_str, units_str
 from QCalculator.Exceptions.QDefStringExceptions import (
     CannotInstantiateQDS,
     InvalidUnitExpression,
-    UndefinedUnit
+    UndefinedUnit,
+    InvalidQDefString
 )
 
 
@@ -22,7 +24,7 @@ class QDefString(str, ABC):
     ureg = DEF_UR
 
     # PH stands for 'placeholder'
-    _general_pattern = rf'PH0{variable_str}PH1=PH2{value_str}PH3{units_str}PH4'
+    _general_pattern = rf'PH0{variable_str}PH1=PH2{value_str}(?:PH3{units_str})?PH4'
     _default_PH = r'.*'
     _nof_PHs = 5  # the number of PHs, NOT the number on the latest PH. If not sure, set it high enough to cover all PHs.
 
@@ -49,7 +51,7 @@ class QDefString(str, ABC):
                 e.add_note('NOTE: Every subclass of QDefString must match not only with the final pattern of the subclass, '
                      'but also with all the patterns of superclasses.')
                 e.add_note(f'Failed pattern: {p}')
-                raise e
+                raise InvalidQDefString(string)
 
         return super().__new__(cls, string)
 
@@ -64,6 +66,7 @@ class QDefString(str, ABC):
         validate_type(pattern, Pattern)
 
         cls._main_regex = pattern
+        cls.ureg = deepcopy(QDefString.ureg)
 
         # append to tuple, basically
         l = list(cls._PH_dicts_order)
@@ -83,7 +86,16 @@ class QDefString(str, ABC):
         # exception saying that QDefString should not be instantiated (otherwise it is very confusing).
         self._match = self.pattern.fullmatch(qds)
         self._raw_string = qds
-        self.check_unit_validity(self.unit)
+
+        unit = self._match.group('unit')
+
+        if unit is not None:
+            unit = str(unit)
+        else:
+            unit = 'dimensionless'
+
+        self.check_unit_validity(unit)
+        self._unit = self.ureg.parse_units(unit)
 
         super().__init__()
 
@@ -117,10 +129,10 @@ class QDefString(str, ABC):
             cls.ureg.parse_units(unit)
 
         except (AssertionError, ValueError, TypeError):
-            raise InvalidUnitExpression(f'The units given for that Datum definition string is an invalid string: "{unit}".')
+            raise InvalidUnitExpression(unit)
 
         except UndefinedUnitError:
-            raise UndefinedUnit(f'The units given for that Datum definition string do not exist: "{unit}".')
+            raise UndefinedUnit(cls, unit)
 
 
     @property
@@ -145,7 +157,7 @@ class QDefString(str, ABC):
 
     @property
     def unit(self) -> Unit:
-        return Unit(str(self._match.group('unit')))
+        return self._unit
 
     @property
     def string(self) -> str:
