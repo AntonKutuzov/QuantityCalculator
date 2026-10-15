@@ -37,7 +37,7 @@ class QDefString(str, ABC):
 
     _PH_dicts_order = (_base_pattern,)  # tuple is used, because it is not mutable, and hence not shared between all classes
     _restrictions = {
-        'variable': tuple(),
+        'symbol': tuple(),
         'value': tuple(),
         'unit': tuple()
     }
@@ -64,10 +64,10 @@ class QDefString(str, ABC):
 
         # check that the string complies with the restrictions
         match = cls._main_regex.fullmatch(string)
-        var = match.group('variable')
+        var = match.group('symbol')
 
-        if cls._restrictions['variable']:
-            if var not in cls._restrictions['variable']:
+        if cls._restrictions['symbol']:
+            if var not in cls._restrictions['symbol']:
                 raise VariableNotAllowed(cls, var)
 
         if cls._restrictions['unit']:
@@ -170,7 +170,7 @@ class QDefString(str, ABC):
         return compile(gp)
 
     @classmethod
-    def _allow(cls, *vs: str | int | float, var_type: Literal['variable', 'value', 'unit']) -> None:
+    def _allow(cls, *vs: str | int | float, var_type: Literal['symbol', 'value', 'unit']) -> None:
         vlist = list(cls._restrictions[var_type])
 
         for v in vs:

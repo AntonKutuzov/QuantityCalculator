@@ -41,5 +41,5 @@ class UnitNotAllowed(UnitException):
 
 
 class VariableNotAllowed(VariableException):
-    def __init__(self, cls, var: str) -> None:
-        super().__init__(f'The provided variable "{var}" is not allowed in class {cls}.')
+    def __init__(self, cls, sym: str) -> None:
+        super().__init__(f'The provided symbol "{sym}" is not allowed in class {cls}.')
