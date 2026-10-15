@@ -1,9 +1,9 @@
-from typing import Dict, Tuple, Optional, Any, Hashable
+from typing import Dict, Tuple, Optional
 from pint import Quantity, Unit
 from sympy import Expr, Eq, Symbol, parse_expr, solve
 
 from QCalculator import DEF_UR
-from QCalculator._util import must_match
+from QCalculator._util import must_match, unpack_keys
 
 
 
@@ -200,20 +200,6 @@ class UnitDict(dict):
 
     # =================================================================================================== PUBLIC HELPERS
     @staticmethod
-    def unpack_keys(d: Dict[Tuple[Any, ...] | Hashable, Any]) -> Dict[Hashable, Any]:
-        unpacked = dict()
-
-        for t, u in d.items():
-            if isinstance(t, tuple):
-                for v in t:
-                    unpacked[v] = u
-            else:
-                unpacked[t] = u
-
-        return unpacked
-
-
-    @staticmethod
     def normalize_units(
             units: Dict[str, str | Unit],
             unit_by_symbol: bool = False
@@ -242,7 +228,7 @@ class UnitDict(dict):
 
     @staticmethod
     def parse_unit_dict(unit_dict: UNITS_DICT, unit_by_symbol: bool = False) -> Dict[str, str]:
-        ud = UnitDict.unpack_keys(unit_dict)
+        ud = unpack_keys(unit_dict)
         ud = UnitDict.normalize_units(ud, unit_by_symbol=unit_by_symbol)
         return ud
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from QCalculator import Datum, DatumDefString, UnitDict
+from QCalculator import Datum, UnitDict
+from QCalculator.DefStrings import DatumDefString
 from QCalculator._util import validate_type, must_match
 
 from typing import List, Optional, Dict, Tuple, Callable

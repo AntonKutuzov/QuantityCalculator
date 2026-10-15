@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pint import UnitRegistry, Quantity, Unit, DimensionalityError, UndefinedUnitError
+from pint import Quantity, Unit, DimensionalityError, UndefinedUnitError
 from sympy.parsing.sympy_parser import parse_expr
 from math import isnan, isinf
 
@@ -9,7 +9,7 @@ from QCalculator.Exceptions.DatumExceptions import (
     IncompatibleUnits,
     InvalidVarName, UndefinedUnit
 )
-from QCalculator.DatumDefString import DatumDefString
+from QCalculator.DefStrings.DatumDefString import DatumDefString
 from QCalculator._util import validate_type
 
 
