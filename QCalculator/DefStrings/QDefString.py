@@ -1,4 +1,4 @@
-from typing import Dict, AnyStr, Match
+from typing import Dict, AnyStr, Match, Tuple, Literal
 from abc import ABC
 from pint import Unit
 from pint.errors import UndefinedUnitError
@@ -13,7 +13,8 @@ from QCalculator.Exceptions.QDefStringExceptions import (
     CannotInstantiateQDS,
     InvalidUnitExpression,
     UndefinedUnit,
-    InvalidQDefString
+    InvalidQDefString,
+    VariableNotAllowed
 )
 
 
@@ -34,7 +35,11 @@ class QDefString(str, ABC):
     _base_pattern = compile(_base_pattern)
 
     _PH_dicts_order = (_base_pattern,)  # tuple is used, because it is not mutable, and hence not shared between all classes
-
+    _restrictions = {
+        'variable': tuple(),
+        'value': tuple(),
+        'unit': tuple()
+    }
 
     def __new__(cls, string: str, *args, **kwargs) -> object:
         # print('__new__', cls)
@@ -44,6 +49,8 @@ class QDefString(str, ABC):
 
         validate_type(string, str)
 
+
+        # check that the string matches patterns of all the subclasses
         for p in cls._PH_dicts_order:
             try:
                 must_match('other', string, p)
@@ -53,25 +60,57 @@ class QDefString(str, ABC):
                 e.add_note(f'Failed pattern: {p}')
                 raise InvalidQDefString(string)
 
+
+        # check that the string complies with the restrictions
+        match = cls._main_regex.fullmatch(string)
+        var = match.group('variable')
+
+        if cls._restrictions['variable']:
+            if var not in cls._restrictions['variable']:
+                raise VariableNotAllowed(cls, var)
+
         return super().__new__(cls, string)
 
 
-    def __init_subclass__(cls, pattern: Pattern[str], **kwargs):
+    def __init_subclass__(
+            cls,
+            pattern: Pattern[str] = None,
+            restrictions: Dict[str, Tuple[str, ...]] = None,
+            **kwargs
+    ):
         """init_subclass methods are ran when the class is constructed, not an instance is created. I.e.
         when the "class" keyword is executed during import of the module/file. So, it is executed before
         "new", which is called when an object is actually created."""
 
         # print('__init_subclass__ QDS', cls)
 
-        validate_type(pattern, Pattern)
+        # resolve class' pattern
+        if pattern is not None:
+            validate_type(pattern, Pattern)
+            cls._main_regex = pattern
+        else:
+            pattern = cls._main_regex
 
-        cls._main_regex = pattern
+        # copy ureg so that it is individual per class
         cls.ureg = deepcopy(QDefString.ureg)
 
-        # append to tuple, basically
+        # append pattern to tuple
         l = list(cls._PH_dicts_order)
         l.append(pattern)
         cls._PH_dicts_order = tuple(l)
+
+        # add restrictions
+        if restrictions is not None:
+            for k in restrictions.keys():
+                validate_type(k, str)
+
+                v = restrictions.get(k)
+
+                if v is not None:
+                    validate_type(v, tuple)
+                    cls._allow(*v, var_type=k)
+                else:
+                    continue
 
         super().__init_subclass__(**kwargs)
 
@@ -116,6 +155,20 @@ class QDefString(str, ABC):
             gp = gp.replace(rf'PH{n}', cls._default_PH)
 
         return compile(gp)
+
+    @classmethod
+    def _allow(cls, *vs: str | int | float, var_type: Literal['variable', 'value', 'unit']) -> None:
+        vlist = list(cls._restrictions[var_type])
+
+        for v in vs:
+            validate_type(v, (str, int, float))
+            must_match(var_type, str(v))
+
+            if var_type == 'unit':
+                v = cls.ureg.parse_units(v)
+            vlist.append(v)
+
+        cls._restrictions[var_type] = tuple(vlist)
 
 
     @classmethod

@@ -16,8 +16,9 @@ class CustomVarDDS(
         4: ')?'
     }))
 ):
-    def __init__(self, dds: str) -> None:
-        super().__init__(dds)
+    def __init__(self, dds: str, *args, **kwargs) -> None:
+        super().__init__(dds, *args, **kwargs)
+
 
     @property
     def symbol(self) -> str:

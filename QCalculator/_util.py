@@ -40,7 +40,7 @@ def validate_types(
         raise TypeError(f'Expected "type" of "List[type | Tuple[type]], got: "{type(check_types)}".')
 
 
-def validate_match(m: Match, match_str: str, regex: str) -> None:
+def validate_match(m: Match, match_str: str, pattern: str) -> None:
     if m is None:
         raise ValueError(f'The string "{match_str}" does not match the {pattern} regex.')
     else:
@@ -48,8 +48,8 @@ def validate_match(m: Match, match_str: str, regex: str) -> None:
 
 
 def must_match(
-        pattern: Literal['symbol', 'variable', 'dds', 'other'],
-        string: str,
+        pattern: Literal['symbol', 'variable', 'value', 'unit', 'dds', 'other'],
+        string: str | int | float,
         custom_pattern: Optional[Pattern] = None
 ) -> Match:
     m = None
@@ -60,6 +60,8 @@ def must_match(
             p = patterns.symbol
         case 'variable':
             p = patterns.variable
+        case 'value':
+            p = patterns.value
         case 'unit':
             p = patterns.unit
         case 'other':

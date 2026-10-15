@@ -10,12 +10,20 @@ class CannotInstantiateQDS(QDefStringException):
         super().__init__('the QDefString class is intended only for creating subclasses, not instantiation.')
 
 
+
 class UnitException(QDefStringException):
+    ...
+
+class VariableException(QDefStringException):
+    ...
+
+class DDSValueError(QDefStringException):
     ...
 
 class InvalidQDefString(QDefStringException):
     def __init__(self, qds: str) -> None:
         super().__init__(f'The QDefString "{qds}" does not match the base pattern.')
+
 
 
 class InvalidUnitExpression(UnitException):
@@ -25,3 +33,10 @@ class InvalidUnitExpression(UnitException):
 class UndefinedUnit(UnitException):
     def __init__(self, cls: type, unit: str):
         super().__init__(f'The units "{unit}" are not defined in the used UnitRegistry of {cls}.')
+
+
+
+
+class VariableNotAllowed(VariableException):
+    def __init__(self, cls, var: str) -> None:
+        super().__init__(f'The provided variable "{var}" is not allowed in class {cls}.')
