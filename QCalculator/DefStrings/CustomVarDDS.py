@@ -73,7 +73,7 @@ class CustomVarDDS(
             return len(str(dec)) - 2
 
     @property
-    def norm_string(self) -> str:
+    def string(self) -> str:
         u = str(self.unit)
         return f'{self.variable} = {self.value} {u}'
 
