@@ -2,7 +2,7 @@ from typing import Literal
 
 from QCalculator.DefStrings.QDefString import QDefString
 from QCalculator._util import unpack_keys
-from QCalculator import DEF_UR
+
 
 
 # PH0<variable>PH1=PH2<value>PH3<units>PH4

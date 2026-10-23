@@ -1,61 +1,38 @@
 # About Quantity Calculator 
 
----
-
-**TABLE OF CONTENTS**
-- [Features](#features)
-- [Structure](#structure)
-  - [Datum](#datum)
-  - [Formula](#formula)
-  - [LinearIterator](#lineariterator)
-- [Notes](#notes)
-
----
+This document presents overview of the Quantity Calculator project.
 
 # Features
 - Iteratively solves a system of (linear) equations
-- Has a custom class for keeping variable's symbol, magnitude and units in one instance
+- Has a custom class for keeping and managing variable's symbol, magnitude and units in one instance
 - Allows to search for a specific target through the system of equations, and optionally stop when the target is found
 - Uses both sympy and pint packages to solve the equations while taking care of units
 
 ## Description
-Quantity Calculator is a small Python package that can be used to solve many linear equations iteratively at once. That means, the code can run through a system of equations, record the obtained results, and run the system again. The system stops either when a target variable is found, or when all the possible variables are found.
+Quantity Calculator is a small Python package that can be used to solve many linear equations iteratively at once. That means, the code can run through a system of equations, record the obtained results, and run the system again. The system stops either when a target variable is found, or when all the possible variables are found. The process automatically takes care of units and performs checks for unit consistency.
 
-This approach is very useful if many equations depend on each other and as many as possible variables need to be found from a given set of conditions.
+This approach is very useful if many equations depend on each other and as many as possible variables need to be found from a given set of conditions. See more in LINK1 use cases.
 
 ## Structure
-The package consists of three main classes: ```Datum```, ```Formula``` and ```LinearIterator```.
+The package is built around three main classes: ```Datum```, ```Formula``` and ```LinearIterator```. This section discusses each class briefly to provide an idea of what each class is used for.
 
 ### Datum
-Datum class stores and allows to modify individual variables. An instance of it is
-created by specifying three important quantities: variable's symbol (such as "m"
-for mass, "v" for velocity, etc.), magnitude in a form of integer or float, and
-the units in a form of a string. The class then allows to convert the quantity
-into compatible units (using ```pint``` inside the class). It also supports multiple
-arithmetic operations with other ```Datum``` instances, ```sympy``` quantities and
-native Python integers or floats. A ```Datum``` instance can be initialized in several
-ways: either directly by using ```Datum``` constructor, or by using a ```sympy``` quantity, or by using a string. Examples are given below.
+Datum class is used to manage pint.Quantity and the symbol linked to a variable in one place. An instance of it is created by specifying three important quantities: variable's symbol (such as "m" or mass, "v" for velocity, etc.), magnitude in a form of integer or float, and he units in a form of a string or pint Unit. To make initiation simpler, Datum accepts a single string, called *datum definition string* (further – DDS), which is a native Python string built according to specific rules. A typical DDS looks like `m = 5 kg` with `m` being variable's symbol, `5` – magnitude, and `kg` – units. The exact rules that all DDS's must obey are listed in the `DatumDefString` class' contract file. LINK1
 
+For example
 ```python
-from QCalculator import Datum
+from QCaluator import Datum
 
-d1 = Datum('m', 10, 'kg')  # init directly by indicating each attribute separately
-d2 = Datum.from_quantity('m', 10*Datum.ureg('kg'))  # Datum.ureg is a pint's UnitRegistry of Datum class
-d3 = Datum.from_string('m = 10 kg')  # spaces are mandatory
+v = Datum('v = 3.6 m/s')
+print(v.to('km/h'))
+'v = 12.96 km/h'
 
-print(d1)
-print(d2)
-print(d3)
-```
-In all three cases the output will be
-
-```commandline
-m = 10.0 kilogram
+v_new = v.scale(2)
+print(v_new)
+'v = 7.2 m/s'
 ```
 
-**NOTE**: when using a ```.from_quantity()``` method, the ```Quantity``` must be created with the ```Datum```'s UnitRegistry ```Datum.ureg```.
-
-A method called ```.as_datum()``` can be also used. It accepts ```Datum```, ```Quantity``` and string and decides itself what to do.
+For arithmetical operations Datum's `quantity` property should be used. 
 
 ### Formula
 ```Formula``` class joins several ```Datum``` instances into one formula, such as 

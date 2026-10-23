@@ -3,7 +3,7 @@ from pint import Quantity, Unit
 from sympy import Expr, Eq, Symbol, parse_expr, solve
 
 from QCalculator import DEF_UR
-from QCalculator._util import must_match, unpack_keys
+from QCalculator.util import must_match, unpack_keys
 
 
 
@@ -83,7 +83,7 @@ class UnitDict(dict):
     ) -> Optional[str]:
         """
         Takes into account `unit_by_symbol` attribute and returns respective units.
-        In case `unit_by_symbol` is True, searches in the default unit dict by using only `symbol` part (as defined
+        In case `unit_by_symbol` is True, searches in the default units dict by using only `symbol` part (as defined
         in DatumDefString) of the variable. Otherwise, uses full `var` name.
 
         For example,
@@ -115,7 +115,7 @@ class UnitDict(dict):
 
         if strict:
             if res is None:
-                raise ValueError(f'Variable "{var}" is not in the provided unit dict: "{unit_dict}".')
+                raise ValueError(f'Variable "{var}" is not in the provided units dict: "{unit_dict}".')
 
         return res
 
@@ -151,7 +151,7 @@ class UnitDict(dict):
                 compatible = self.compatible_with_default(var, units)
                 defu = self.get(var)
                 if not compatible:
-                    raise Exception(f'Unit "{units}" for variable "{var}" is not compatible with the default unit "{defu}".')
+                    raise Exception(f'Unit "{units}" for variable "{var}" is not compatible with the default units "{defu}".')
             return units
 
 
@@ -169,7 +169,7 @@ class UnitDict(dict):
     @classmethod
     def _str_units_to_sympy_units_expr(cls, u_expr_str: str) -> Expr:
         """
-        Converts arbitrary unit expressions into sympy expressions where each unit is represented as a symbol. For
+        Converts arbitrary units expressions into sympy expressions where each units is represented as a symbol. For
         example, a string "J / mole / K" is first converted to pint's <Unit('joule / mole / kelvin')>, and then
         to sympy's Expr: 'joule/(kelvin*mole)'. The free symbols of that expression consequently are
         '{mole, joule, kelvin}'.
@@ -178,7 +178,7 @@ class UnitDict(dict):
         Thus, this function does not preserve values, only units.
 
         :param u_expr_str: an expression of units expressed as Python's str
-        :return: sympy.Expr where each unit is a separate Symbol
+        :return: sympy.Expr where each units is a separate Symbol
         """
 
         u_expr = cls._ureg.parse_units(u_expr_str)

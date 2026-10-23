@@ -1,6 +1,6 @@
 from pint import UndefinedUnitError, Unit
 from typing import Any, Tuple, Match, Literal, Optional, Pattern, Dict, List, overload
-from QCalculator.DefStrings import patterns
+from QCalculator import patterns
 from QCalculator.Exceptions.QDefStringExceptions import (
     UndefinedUnit,
     InvalidUnitExpression
@@ -54,7 +54,7 @@ def validate_match(m: Match, match_str: str, pattern: str) -> None:
 
 
 def must_match(
-        pattern: Literal['symbol', 'variable', 'value', 'unit', 'dds', 'other'],
+        pattern: Literal['symbol', 'variable', 'value', 'units', 'dds', 'other'],
         string: str | int | float,
         custom_pattern: Optional[Pattern] = None
 ) -> Match:
@@ -68,7 +68,7 @@ def must_match(
             p = patterns.variable
         case 'value':
             p = patterns.value
-        case 'unit':
+        case 'units':
             p = patterns.unit
         case 'other':
             if custom_pattern is not None:

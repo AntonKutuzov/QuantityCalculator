@@ -27,16 +27,16 @@ class InvalidQDefString(QDefStringException):
 
 
 class InvalidUnitExpression(UnitException):
-    def __init__(self, unit: str) -> None:
-        super().__init__(f'The unit expression "{unit}" is invalid.')
+    def __init__(self, units: str) -> None:
+        super().__init__(f'The units expression "{units}" is invalid.')
 
 class UndefinedUnit(UnitException):
-    def __init__(self, cls: type, unit: str):
-        super().__init__(f'The units "{unit}" are not defined in the used UnitRegistry of {cls}.')
+    def __init__(self, cls: type, units: str):
+        super().__init__(f'The units "{units}" are not defined in the used UnitRegistry of {cls}.')
 
 class UnitNotAllowed(UnitException):
-    def __init__(self, cls, unit: str) -> None:
-        super().__init__(f'The provided unit "{unit}" is not allowed in class {cls}.')
+    def __init__(self, cls, units: str) -> None:
+        super().__init__(f'The provided units "{units}" is not allowed in class {cls}.')
 
 
 

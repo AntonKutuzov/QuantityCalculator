@@ -1,25 +1,24 @@
+from abc import abstractmethod
 from typing import Dict, AnyStr, Match, Tuple, Literal
-from abc import ABC
-from pint import Unit
-from pint.errors import UndefinedUnitError
+# from abc import ABC  # import if you want to make the class abstract
 from re import compile, Pattern
 from copy import deepcopy
+from sympy import parse_expr
 
 from QCalculator import DEF_UR
-from QCalculator._util import must_match, validate_type, validate_types, check_unit_validity
-from QCalculator.DefStrings.patterns import variable_str, value_str, units_str
+from QCalculator.Exceptions.DatumExceptions import InvalidVarName  # must migrate to the DDS exceptions
+from QCalculator.util import must_match, validate_type, validate_types, check_unit_validity
+from QCalculator.patterns import variable_str, value_str, units_str
 
 from QCalculator.Exceptions.QDefStringExceptions import (
     CannotInstantiateQDS,
-    InvalidUnitExpression,
-    UndefinedUnit,
     InvalidQDefString,
     VariableNotAllowed,
     UnitNotAllowed
 )
 
 
-class QDefString(str, ABC):
+class QDefString(str):
     """Note that due to absence of several crucial variables, QDefString cannot be instantiated itself. It should
     only be used for inheritance."""
 
@@ -42,13 +41,14 @@ class QDefString(str, ABC):
         'unit': tuple()
     }
 
-    def __new__(cls, string: str, *args, **kwargs) -> object:
+    def __new__(cls, string: str, *args, sympy_safe: bool, **kwargs) -> object:
         # print('__new__', cls)
 
         if cls is QDefString:
             raise CannotInstantiateQDS()
 
         validate_type(string, str)
+        validate_type(sympy_safe, bool)
 
 
         # check that the string matches patterns of all the subclasses
@@ -121,33 +121,31 @@ class QDefString(str, ABC):
 
                 if v is not None:
                     validate_type(v, tuple)
-                    cls._allow(*v, var_type=k)
+                    cls._add_restriction(*v, var_type=k)
                 else:
                     continue
 
         super().__init_subclass__(**kwargs)
 
 
-    def __init__(self, qds: str, *args, **kwargs):
-        # print('__init__ QDS')
+    def __init__(self, qds: str, *args, sympy_safe: bool, **kwargs):
+        # types of qds and sympy_safe are checked in __new__
 
-        validate_type(qds, str)
-
-        # if `qds = QDefString('m = 5 kg')` is called, "AttributeError: 'QDefString' object has no attribute '_main_regex'"
-        # will be raised. This is OK, since I don't want QDefString to be instantiated. However, turn it into a proper
-        # exception saying that QDefString should not be instantiated (otherwise it is very confusing).
         self._match = self.pattern.fullmatch(qds)
-        self._raw_string = qds
+        self._sympy_safe = sympy_safe
+        self._check_sympy_safety(self.variable)
 
-        unit = self._match.group('unit')
+        units = self._match.group('units')
 
-        if unit is not None:
-            unit = str(unit)
+        if units is not None:
+            units = str(units)
         else:
-            unit = 'dimensionless'
+            units = 'dimensionless'
 
-        self.check_unit_validity(unit)
-        self._unit = self.ureg.parse_units(unit)
+        check_unit_validity(self, units)
+
+        self._units = units
+        self._raw_string = qds
 
         super().__init__()
 
@@ -170,35 +168,31 @@ class QDefString(str, ABC):
         return compile(gp)
 
     @classmethod
-    def _allow(cls, *vs: str | int | float, var_type: Literal['symbol', 'value', 'unit']) -> None:
+    def _add_restriction(cls, *vs: str | int | float, var_type: Literal['symbol', 'value', 'units']) -> None:
         vlist = list(cls._restrictions[var_type])
 
         for v in vs:
             validate_type(v, (str, int, float))
             must_match(var_type, str(v))
 
-            if var_type == 'unit':
+            if var_type == 'units':
                 v = cls.ureg.parse_units(v)
             vlist.append(v)
 
         cls._restrictions[var_type] = tuple(vlist)
 
 
-    @classmethod
-    def check_unit_validity(cls, unit: str | Unit) -> None:
-        if not isinstance(unit, (str, Unit)):
-            raise TypeError(f'Expected "str" or "pint.Unit", got: "{unit}".')
-
-        unit = str(unit)
-
-        try:
-            cls.ureg.parse_units(unit)
-
-        except (AssertionError, ValueError, TypeError):
-            raise InvalidUnitExpression(unit)
-
-        except UndefinedUnitError:
-            raise UndefinedUnit(cls, unit)
+    def _check_sympy_safety(self, symbol: str) -> None:
+        if self._sympy_safe:
+            try:
+                parse_expr(f'{symbol} - 1')
+            except TypeError as e:
+                raise InvalidVarName(
+                    var=symbol,
+                    details=f'The symbol "{symbol}" cannot be used in sympy expressions.\nTo ignore, set "sympy_safe" to True in constructor.'
+                ) from e
+        else:
+            return None
 
 
     @property
@@ -222,13 +216,14 @@ class QDefString(str, ABC):
         return float(self._match.group('value'))
 
     @property
-    def unit(self) -> Unit:
-        return self._unit
+    def units(self) -> str:
+        return self._units
 
     @property
-    def string(self) -> str:
+    def raw_string(self) -> str:
         return self._raw_string
 
-
-if __name__ == '__main__':
-    pass
+    @property
+    @abstractmethod
+    def string(self) -> str:
+        ...

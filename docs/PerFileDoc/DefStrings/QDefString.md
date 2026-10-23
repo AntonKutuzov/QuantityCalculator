@@ -1,0 +1,1 @@
+QDefString is an abstract class used to create custom definition strings. The new class is created by inheriting from QDefString and specifying several parameters.
