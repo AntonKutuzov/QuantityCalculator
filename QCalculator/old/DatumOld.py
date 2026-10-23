@@ -10,7 +10,7 @@ from QCalculator.Exceptions.DatumExceptions import (
     InvalidVarName, UndefinedUnit
 )
 from QCalculator.DefStrings.DatumDefString import DatumDefString
-from QCalculator._util import validate_type, check_unit_validity
+from QCalculator.util import validate_type, check_unit_validity
 
 
 class Datum:
