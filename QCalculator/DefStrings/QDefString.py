@@ -38,7 +38,7 @@ class QDefString(str):
     _restrictions = {
         'symbol': tuple(),
         'value': tuple(),
-        'unit': tuple()
+        'units': tuple()
     }
 
     def __new__(cls, string: str, *args, sympy_safe: bool, **kwargs) -> object:
