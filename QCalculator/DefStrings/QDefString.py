@@ -41,14 +41,13 @@ class QDefString(str):
         'units': tuple()
     }
 
-    def __new__(cls, string: str, *args, sympy_safe: bool, **kwargs) -> object:
+    def __new__(cls, string: str, *args, **kwargs) -> object:
         # print('__new__', cls)
 
         if cls is QDefString:
             raise CannotInstantiateQDS()
 
         validate_type(string, str)
-        validate_type(sympy_safe, bool)
 
 
         # check that the string matches patterns of all the subclasses
@@ -70,12 +69,12 @@ class QDefString(str):
             if var not in cls._restrictions['symbol']:
                 raise VariableNotAllowed(cls, var)
 
-        if cls._restrictions['unit']:
-            unit = match.group('unit')
+        if cls._restrictions['units']:
+            unit = match.group('units')
             check_unit_validity(cls, unit)
             unit = cls.ureg.parse_units(unit)
 
-            for u in cls._restrictions['unit']:
+            for u in cls._restrictions['units']:
                 if unit.is_compatible_with(u):
                     break
             else:
