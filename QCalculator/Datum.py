@@ -7,7 +7,7 @@ from QCalculator.DefStrings.AbstractDDS import AbstractDDS
 from QCalculator.DefStrings.DatumDefString import DatumDefString
 from QCalculator.DefStrings.DSpec import DSpec
 from QCalculator.util import validate_type, check_unit_validity
-from tests._Older.Exceptions.DatumExceptions import UndefinedUnit, IncompatibleUnits
+from QCalculator.Exceptions.QDefStringExceptions import UndefinedUnits, IncompatibleUnits
 
 
 
@@ -51,7 +51,7 @@ class Datum:
             return cls.spec.ureg.parse_units(str(u))
 
         except UndefinedUnitError:
-            raise UndefinedUnit(f'The units given for that Datum definition string do not exist: "{u}".')
+            raise UndefinedUnits(cls, u)
 
     # =================================================================================================== PUBLIC METHODS
     def to(self, units: str | Unit) -> Datum:
