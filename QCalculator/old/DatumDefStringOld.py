@@ -4,7 +4,7 @@ from typing import Literal
 from collections import  namedtuple
 
 from QCalculator import DEF_UR
-from QCalculator.Exceptions.DatumExceptions import (
+from tests._Older.Exceptions.DatumExceptions import (
     InvalidDatumDefString,
     InvalidUnitExpression,
     UndefinedUnit

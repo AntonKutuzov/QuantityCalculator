@@ -5,7 +5,7 @@ from sympy.parsing.sympy_parser import parse_expr
 from math import isnan, isinf
 
 from QCalculator import DEF_UR
-from QCalculator.Exceptions.DatumExceptions import (
+from tests._Older.Exceptions.DatumExceptions import (
     IncompatibleUnits,
     InvalidVarName, UndefinedUnit
 )

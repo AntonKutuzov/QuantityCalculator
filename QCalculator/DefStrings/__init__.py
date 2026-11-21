@@ -1,2 +1,4 @@
-from QCalculator.DefStrings.QDefString import QDefString
+from QCalculator.DefStrings.DSpec import DSpec
+from QCalculator.DefStrings.PatternGenerator import PatternGenerator
+from QCalculator.DefStrings.AbstractDDS import AbstractDDS
 from QCalculator.DefStrings.DatumDefString import DatumDefString

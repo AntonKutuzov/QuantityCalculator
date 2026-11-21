@@ -3,4 +3,6 @@ The apps sync immediately.
 
 To open docs in Obsidian, go to vault called "docs" (because this is the name of the folder in PyCharm).
 
+**These documents are internal and should not be considered package's documentation. They may contain mistakes; they are incomplete.**
+
 

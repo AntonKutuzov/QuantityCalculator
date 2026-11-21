@@ -1,5 +1,5 @@
 from QCalculator import LinearIterator, Formula, Datum
-from QCalculator.Exceptions.DatumExceptions import InvalidString, InvalidSymbol, UndefinedUnit
+from tests._Older.Exceptions.DatumExceptions import InvalidString, InvalidSymbol, UndefinedUnit
 from QCalculator.Exceptions.FormulaExceptions import SymbolNotFound
 from QCalculator.Exceptions.LinearIteratorExceptions import (
     NoValueError,

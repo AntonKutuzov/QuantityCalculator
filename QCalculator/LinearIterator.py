@@ -1,5 +1,5 @@
 from QCalculator import Formula, Datum
-from QCalculator.Exceptions.DatumExceptions import InvalidDatumDefString
+from tests._Older.Exceptions.DatumExceptions import InvalidDatumDefString
 from QCalculator.Exceptions.LinearIteratorExceptions import (
     NoValueError,
     UnusedSymbolError,

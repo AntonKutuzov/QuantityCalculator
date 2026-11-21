@@ -5,13 +5,8 @@ class QDefStringException(QCException):
     pass
 
 
-class CannotInstantiateQDS(QDefStringException):
-    def __init__(self):
-        super().__init__('the QDefString class is intended only for creating subclasses, not instantiation.')
 
-
-
-class UnitException(QDefStringException):
+class UnitsException(QDefStringException):
     ...
 
 class VariableException(QDefStringException):
@@ -26,20 +21,34 @@ class InvalidQDefString(QDefStringException):
 
 
 
-class InvalidUnitExpression(UnitException):
+class SymbolSympyUnsafe(VariableException):
+    def __init__(self, symbol: str):
+        super().__init__(f'The symbol "{symbol}" cannot be used in expressions with sympy.')
+
+class InvalidVarName(VariableException):
+    def __init__(self, var: str) -> None:
+        super().__init__(f'The variable with name "{var}" cannot be used.')
+
+
+
+class FilteringException(DDSValueError):
+    def __init__(self, val: float|int) -> None:
+        super().__init__(f'The value {val} did not pass one of the filtering conditions.')
+
+
+
+class InvalidUnitsExpression(UnitsException):
     def __init__(self, units: str) -> None:
         super().__init__(f'The units expression "{units}" is invalid.')
 
-class UndefinedUnit(UnitException):
+class UndefinedUnits(UnitsException):
     def __init__(self, cls: type, units: str):
         super().__init__(f'The units "{units}" are not defined in the used UnitRegistry of {cls}.')
 
-class UnitNotAllowed(UnitException):
+class IncompatibleUnits(UnitsException):
+    def __init__(self, from_unit: str, to_unit: str):
+        super().__init__(f'Could not convert units {from_unit} to {to_unit}.')
+
+class UnitsNotAllowed(UnitsException):
     def __init__(self, cls, units: str) -> None:
         super().__init__(f'The provided units "{units}" is not allowed in class {cls}.')
-
-
-
-class VariableNotAllowed(VariableException):
-    def __init__(self, cls, sym: str) -> None:
-        super().__init__(f'The provided symbol "{sym}" is not allowed in class {cls}.')

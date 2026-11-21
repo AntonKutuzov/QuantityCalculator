@@ -1,5 +1,5 @@
 from QCalculator import Formula, Datum
-from QCalculator.Exceptions.DatumExceptions import InitializationError
+from tests._Older.Exceptions.DatumExceptions import InitializationError
 from QCalculator.Exceptions.FormulaExceptions import (
     ConsistencyError,
     IncompatibleUnitsError,

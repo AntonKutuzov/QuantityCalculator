@@ -2,9 +2,11 @@ from pint import UndefinedUnitError, Unit
 from typing import Any, Tuple, Match, Literal, Optional, Pattern, Dict, List, overload
 from QCalculator import patterns
 from QCalculator.Exceptions.QDefStringExceptions import (
-    UndefinedUnit,
-    InvalidUnitExpression
+    UndefinedUnits,
+    InvalidUnitsExpression,
+    SymbolSympyUnsafe
 )
+from tokenize import TokenError
 
 
 
@@ -12,28 +14,25 @@ def validate_type(
         check_vars: Any,
         check_types: type | Tuple[type, ...]
 ) -> None:
+    """Checks that the provided variable is an instance of one of the provided types."""
     if not isinstance(check_vars, check_types):
         raise TypeError(f'Expected "{check_types}", got: "{type(check_vars)}".')
 
-
-@overload
-def validate_types(
-        check_vars: List[Any],
-        check_types: type
-) -> None:
-    ...
-
-@overload
-def validate_types(
-        check_vars: List[Any],
-        check_types: Tuple[type]
-) -> None:
-    ...
 
 def validate_types(
         check_vars: List[Any],
         check_types: List[type | Tuple[type]]
 ) -> None:
+    """
+    Checks that one or more provided variables belong to one or more types. The function wraps validate_type for a more
+    general case.
+
+    For every variable in the "check_vars" list the function
+    """
+
+    if not len(check_vars) == len(check_types):
+        raise ValueError('The lengths of "check_vars" and "check_types" lists must be the same.')
+
     if isinstance(check_types, (type, tuple)):
         for v in check_vars:
             validate_type(v, check_types)
@@ -46,19 +45,12 @@ def validate_types(
         raise TypeError(f'Expected "type" of "List[type | Tuple[type]], got: "{type(check_types)}".')
 
 
-def validate_match(m: Match, match_str: str, pattern: str) -> None:
-    if m is None:
-        raise ValueError(f'The string "{match_str}" does not match the {pattern} regex.')
-    else:
-        return
-
 
 def must_match(
-        pattern: Literal['symbol', 'variable', 'value', 'units', 'dds', 'other'],
+        pattern: Literal['symbol', 'variable', 'value', 'units', 'other'],
         string: str | int | float,
         custom_pattern: Optional[Pattern] = None
 ) -> Match:
-    m = None
     p: Pattern
 
     match pattern:
@@ -69,11 +61,10 @@ def must_match(
         case 'value':
             p = patterns.value
         case 'units':
-            p = patterns.unit
+            p = patterns.units
         case 'other':
             if custom_pattern is not None:
                 p = custom_pattern
-                # m = custom_pattern.fullmatch(string)
             else:
                 raise ValueError(f'The regex "{pattern}" is not supported.')
         case _:
@@ -88,6 +79,8 @@ def must_match(
 
 
 def unpack_keys(d: Dict[Tuple[Any, ...] | Any, Any]) -> Dict[Any, Any]:
+    validate_type(d, dict)
+
     unpacked = dict()
 
     for t, u in d.items():
@@ -102,16 +95,31 @@ def unpack_keys(d: Dict[Tuple[Any, ...] | Any, Any]) -> Dict[Any, Any]:
 
 
 def check_unit_validity(cls, unit: str | Unit) -> None:
-    if not isinstance(unit, (str, Unit)):
-        raise TypeError(f'Expected "str" or "pint.Unit", got: "{unit}".')
+    validate_type(unit, (str, Unit))
+
+    try:
+        getattr(cls, 'spec')
+    except AttributeError:
+        raise TypeError(f'The class "{cls}" does not have a "spec" attribute.')
 
     unit = str(unit)
 
     try:
-        cls.ureg.parse_units(unit)
+        cls.spec.ureg.parse_units(unit)
 
-    except (AssertionError, ValueError, TypeError):
-        raise InvalidUnitExpression(unit)
+    except (AssertionError, ValueError, TypeError, TokenError):
+        raise InvalidUnitsExpression(unit)
 
     except UndefinedUnitError:
-        raise UndefinedUnit(cls, unit)
+        raise UndefinedUnits(cls, unit)
+
+
+def check_sympy_safety(symbol: str) -> None:
+    from sympy import parse_expr
+
+    try:
+        parse_expr(f'{symbol} - 1')
+    except TypeError as e:
+        raise SymbolSympyUnsafe(
+            f'The symbol "{symbol}" cannot be used in sympy expressions.\nTo ignore, set "sympy_safe" to True in constructor.'
+        ) from e

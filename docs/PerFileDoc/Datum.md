@@ -1,7 +1,7 @@
 ## Scope
 The Datum class represents a named physical quantity, such as `m = 5.2 kg`. The word "Datum" stands for singular of "Data" and must be understood as "a piece of data". The string representing a Datum instance (such as `m = 5.2 kg`) is called a "Datum definition string" (dds for short).
 
-The Datum class is used to create and operate on a single named physical quantity (a single datum). The dds's are parsed by a separate class called [[Datum Definition String and DatumDefString class|DatumDefString]].
+The Datum class is used to create and operate on a single named physical quantity (a single datum). The dds's (Datum definition strings) are parsed by a separate class called [[Datum definition string]].
 
 ### General structure of the class
 Since Datum is created to operate on a single physical quantity, the class consists of the following parts:
@@ -14,23 +14,25 @@ Since Datum is created to operate on a single physical quantity, the class consi
 ```python
 class Datum:
 # class attributes
-ureg = UnitRegistry(system='SI')
+ddef: AbstractDDS = DatumDefString
+spec: DSPec = DatumDefString.spec
 
 # Constructors
-def __init__(dds: str | DatumDefString, sympy_safe: bool = True) -> None
+def __init__(dds: str) -> None
+
 @classmethod
-def from_quantity(s: str, q: Quantity, sympy_safe: bool = True) -> Datum
+def from_quantity(s: str, q: Quantity) -> Datum
 
 # Magic methods
 def __str__() -> str
-def __eq__(d: Datum) -> bool
+def __eq__(other: Datum) -> bool
 
 # Comparison
 def compatible_units(other: Datum|Quantity|str|Unit) -> bool
 
 # Converters
 '''Alters the dds as well!'''
-def to(u: str|Unit) -> Datum
+def to(units: str|Unit) -> Datum
 def scale(factor: float|int) -> Datum
 
 # properties
@@ -44,35 +46,26 @@ def dds -> DatumDefString
 
 ## Methods
 ### Constructors
-There are two possible constructors in Datum class. The default one accepts a dds and turns it into a Datum instance. An alternative constructor creates a Datum instance from a pint.Quantity instance, and is primarily used after arithmetic operations performed on Datum instances that result in Quantities. For example,
-
-```python
-d = Datum('g_Earth = 9.81 m/s**2')
-t = Datum('t = 10 s')
-
-vq = d.quantity * t.quantity
-v = Datum.from_quantity('v', vq)
-print(v)
-# 'v = 98.1 m/s'
-```
+There are two possible constructors in Datum class. The default one accepts a dds and turns it into a Datum instance. An alternative constructor creates a Datum instance from a pint.Quantity instance, and is primarily used after arithmetic operations performed on Datum instances that result in Quantities. See [[Datum#Use cases|examples]].
 
 #### `__init__`
-The \_\_init__ method accepts a datum definition string, and turns it into a Datum instance.
+The \_\_init__ method accepts a datum definition string[^1], and turns it into a Datum instance.
 
-`IIT-1` – The method checks the type of a dds, and if it is not an instance of string or DatumDefString, raises `TypeError`
-`IIT-2` – The method checks the type of `sympy_safe` and if it is not `bool`, raises `TypeError`
-`IIT-3` – In case dds parameter is an instance of `str`, passes it with no changes to DatumDefString constructor. Does not catch any exceptions raised by DatumDefString
-`IIT-4` – In case `sympy_sage` flag is `True`, and the symbol cannot be used with `sympy` (raises `TypeError`), catches it and raises `InvalidVarName` exception.
-`IIT-5` – The units of returned Datum instance belong to the internal UnitRegistry of Datum class
+- The method checks the type of a dds, and if it is not an instance of string, raises `TypeError`
+- In case dds parameter is an instance of `str`, passes it with no changes to DatumDefString constructor. Does not catch any exceptions raised by DatumDefString
+- The units of returned Datum instance belong to the UnitRegistry specified in the `spec` attribute
+
+Since Datum possesses many properties that 'disassemble' it (such as `symbol`, `subscript`, `exponent` and others), there is no way to define it by specifying these values separately. To define Datum from the separate variables containing variable, value, and units, use f-strings. See [[Datum#Use cases|examples]].
+
+[^1]: Since [[AbstractDDS]] is a subclass of Python's str, Datum can accept both [[DatumDefString]] and other subclasses of AbstarctDDS, and plain Python's str.
 
 #### from_quantity
-The `from_quantity` method accepts a `pint.Quantity` instance and an instance of string which is used as a symbol.
+The `from_quantity` method accepts a `pint.Quantity` instance and an instance of string which is used as a symbol. 
 
-`FQC-1` – The method checks the type of the three parameters and if they are not of indicated types, raises `TypeError`
-`FQC-2` – The method uses `q.magnitude` and `q.units` to construct a DDS, and then passes it to the `__init__` method
-`FQC-3` – Returns a Datum instance with respective variable, value and units
-`FQC-4` – The units of returned Datum instance belong to the internal UnitRegistry of Datum class
-
+- The method checks the type of the two parameters and if they are not of indicated types, raises `TypeError`. (You don't need to reject the AbstractDDS instances, since they won't match to the variable [[patterns|pattern]]).
+- The method uses `q.magnitude` and `q.units` to construct an f-string, and then passes it to the `__init__` method
+- Returns a Datum instance with respective variable, value and units
+- The units of returned Datum instance belong to the UnitRegistry specified in the `spec` attribute
 
 ### Magic methods
 There are two magic methods defined in Datum class: the `__eq__` and `__str__` methods. No arithmetic methods are defined, because they cause hard-to-trace errors when used with Quantity instances, and because they produce Quantity instances which is misleading in both cases.
@@ -103,28 +96,28 @@ d2.base == b3.base
 
 The `__eq__` method
 
-`EQM-1` – Checks whether the `other` parameter is Datum[^1]. If not, raises `TypeError`
-`EQM-2` – Returns a boolean indicating whether the two Datum instances are equal
+- Checks whether the `other` parameter is Datum[^2]. If not, raises `TypeError`
+- Returns a boolean indicating whether the two Datum instances are equal
 
 As a result of the requirements above it also must hold that
-`EQM-3` – The dds's of both Datums are the same (within the floating point precision, so the actual strings may differ slightly, but the properties of respective DatumDefString instances, such as `exponent`, `sign` and other must be the same).
-`EQM-4` – The value of `quantity` property must be the same
+- The dds's of both Datums are the same (within the floating point precision, so the actual strings may differ slightly, but the properties of respective DatumDefString instances, such as `exponent`, `sign` and other must be the same).
+- The value of `quantity` property must be the same
 
-[^1]: That means, it doesn't use `isinsance`, but rather `type(other) is Datum`, because subclasses are most likely have other equality requirements.
+[^2]: That means, it doesn't use `isinsance`, but rather `type(other) is Datum`, because subclasses are most likely have other equality requirements.
 
 #### `__str__`
-The `__str__` method returns a dds of the Datum instance by using DatumDefString's property `d.dds.string`.
+The `__str__` method returns a dds of the Datum instance by using DatumDefString's property `d.dds.string` (normalized string).
 
 ### Comparison methods
 Currently there's one comparison method which checks whether the Datum instance is compatible with indicated units – `compatible_unit`. The method
 
-`CUC-1` – Checks whether the `other` parameter is an instance of `Datum`, `Quantity`, `str`, or `pint.Unit`. Otherwise, raises `TypeError`.
-`CUC-2` – If the parameter is an instance of `str`, and it obeys the rules of unit defining strings, but defined an unknown unit, raises `UndefinedUnit` exception
-`CUC-3` – If the parameter is an instance of `str`, and the string is malformed, raises `InvalidUnitExpression` exception
-`CUC-4` – Returns `True` if the units are compatible, otherwise returns `False`.
+- Checks whether the `other` parameter is an instance of `Datum`, `Quantity`, `str`, or `pint.Unit`. Otherwise, raises `TypeError`.
+- If the parameter is an instance of `str`, and it obeys the [[patterns|rules]] of units-defining strings, but defined an unknown unit, raises `UndefinedUnit` exception
+- If the parameter is an instance of `str`, and the string is malformed, raises `InvalidUnitExpression` exception
+- Returns `True` if the units are compatible, otherwise returns `False`.
 
 ### Converters
-Datum instances are immutable (see invariants), but there are two methods that are shortcuts for the following code in python:
+Datum instances are immutable (see [[Datum#Invariants|invariants]]), but there are two methods that are shortcuts for the following code in python:
 ```python
 # instead of
 d = Datum('v = 10 m/s')
@@ -141,58 +134,58 @@ d = Datum(f'{d.variable} = {val} {d.units}')
 d = Datum.scale(0.5)
 ```
 
-Hence the method behavior.
+Hence the method behaviour.
 
 #### to
 The `to` method converts units of the Datum instance to the units indicated.
 
-`TOC-1` – Checks that the type of the `u` parameter is either `str` or `pint.Unit`. Otherwise, raises `TypeError`.
-`TOC-2` – If the parameter is an instance of `str`, and it obeys the rules of unit defining strings, but defines an unknown unit, raises `UndefinedUnit` exception
-`TOC-3` – If the parameter is an instance of `str`, and the string is malformed, raises `InvalidUnitExpression` exception
-`TOC-4` – If the units cannot be converted to one another, raises `IncompatibleUnits` exception
-`TOC-5` – returns a Datum instance converted to the new units
-`TOC-6` – returns a new Datum with a new `dds` property (see properties section)
-`TOC-7` – returns a new Datum with changed `quantity`, `value`, and `units` properties
+- Checks that the type of the `units` parameter is either `str` or `pint.Unit`. Otherwise, raises `TypeError`.
+- If the parameter is an instance of `str`, and it obeys the [[patterns|rules]] of units-defining string, but defines an unknown unit, raises `UndefinedUnit` exception
+- If the parameter is an instance of `str`, and the string is malformed, raises `InvalidUnitExpression` exception
+- If the units cannot be converted to one another, raises `IncompatibleUnits` exception
+- returns a Datum instance converted to the new units
+-  returns a new Datum with a new `dds` property (see [[Datum#Properties|properties]])
+- returns a new Datum with changed `quantity`, `value`, and `units` properties
 
 #### scale
 The `scale` method allows to change numerical value of Datum without writing full redefinition.
 
-`SCL-1` – Checks that the `factor` parameter is an instance of `float` or `int`, otherwise raises `TypeError`.
-`SCL-2` – In case `factor` is `nan`,  `inf`, or `-inf`, raises `ValueError`
-`SCL-3` – Returns a Datum instance with value equal to the old value multiplied by `factor`
+- Checks that the `factor` parameter is an instance of `float` or `int`, otherwise raises `TypeError`.
+- In case `factor` is `nan`,  `inf`, or `-inf`, raises `ValueError`
+- Returns a Datum instance with value equal to the old value multiplied by `factor`
 
 ## Properties
 The properties provide access to the most important Datum attributes such as variable, value, unit and some others. NOTE: to access details about the dds, use `.dds` property. To access all the same properties of a Datum converted to its base units, use `.base` property.
 
 ### `quantity` property
-`QTP-1` – Returns a `pint.Quantity` that Datum currently possesses
-`QTP-2` – Changes if value or unit of Datum changes
+- Returns a `pint.Quantity` that Datum currently possesses (value multiplied by units)
+- Changes if value or units of Datum change
 
 ### `variable` property
-`VRP-1` – The `variable` property just copies the `dds.variable` property.
+- The `variable` property just copies the `dds.variable` property.
 
 ### `value` property
-`VLP-1` – The `value` property just copies the `dds.value` property.
+- The `value` property just copies the `dds.value` property.
 
 ### `units` property
-`UTP-1` – The `units` property just copies the `dds.unit` property.
+- Returns the value of `dds.units`, but parsed with the UnitRegistry specified in `spec` attribute
 
 ### `base` property
 The `base` property returns a Datum instance converted to respective base units.
 
-`BUP-1` – Returns a Datum instance converted to base units
-`BUP-2` – If the original Datum instance was already in base units, returns a new Datum equal to the old one
+- Returns a Datum instance converted to base units
+- If the original Datum instance was already in base units, returns a new Datum equal to the old one
 
 **Note**: yes, you can do it `self.base.base.base.base. ...`
 
 ### `dds` property
 The `dds` property returns a DatumDefString object with respective values.
 
-`DSP-1` – Returns a `DatumDefString` object
-`DSP-2` – The DDS is created during initialization from the provided data
+- Returns a `DatumDefString` object
+- The DDS is created during initialization from the provided data
 
 ## Errors
-The structure of exceptions used in Datum class is the following. Some of the exceptions are also used in DatumDefString class.
+The structure of exceptions used in Datum class is the following. Some of the exceptions are also used in [[AbstractDDS]] class.
 
 ```
 DatumException  
@@ -209,7 +202,7 @@ DatumException
 ## Invariants
 
 - Neither of the actions change any of the properties of the same Datum instance (Datum instances are immutable)
-- DDS from the `d.dds` property always represents up-to-date value and units
+- DDS from the `.dds` property always represents up-to-date value and units (i.e. it changes after value or units were changed)
 - `d.quantity == d.value * d.units`
 
 The following expressions must always be True
@@ -224,14 +217,14 @@ The following expressions must always be True
 
 - `d.dds.value == d.value`
 - `d.dds.variable == d.variable`
-- `d.units == d.ureg.Unit(d.dds.unit)`
+- `d.units == d.spec.ureg.parse_units(d.dds.units)`
 
 ```python
 dds = 'm = 5 kg'
 d1 = Datum(dds)
 d2 = Datum(d1.dds)
 
-d1.dds == d2.dds == dds
+d1.dds == d2.dds == dds  # NOT TRUE!
 d1 == d2
 d1.base.dds == d2.base.dds
 ```
@@ -262,8 +255,8 @@ d1 == d3 is True
 
 ```python
 d = Datum('m = 15 g')
-d.unit == d.ureg.Unit('g')  # raises no exception, i.e. d.unit always belongs to the Datum's internal UnitRegistry
-d.quantity == d.ureg('15 g')  # same for d.quantity
+d.unit == d.spec.ureg.parse_units('g')  # raises no exception, i.e. d.units always belongs to the Datum's UnitRegistry
+d.quantity == d.spec.ureg('15 g')  # same for d.quantity
 ```
 
 ## Use cases
@@ -311,4 +304,13 @@ print(newd)
 other_d = d.scale(2)
 print(other_d)
 # 'm = 30 kg'
+
+# Defining Datum from separate variables
+var = 'm'
+val = 15
+u = 'kg'
+
+d = Datum(f'{var} = {val} {u}')
+print(d)
+# 'm = 15 kilogram'
 ```
