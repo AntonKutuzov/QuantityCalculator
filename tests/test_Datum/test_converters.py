@@ -1,10 +1,10 @@
 import pytest
-from pint import Unit, UnitRegistry
+from pint import Unit, UnitRegistry, Quantity
 from math import isclose
 
 from QCalculator.Datum import Datum
 from QCalculator.Exceptions.QDefStringExceptions import InvalidUnitsExpression, UndefinedUnits, IncompatibleUnits
-from tests._Older.test_Datum import d1, d2
+from tests.test_Datum import d1, d2
 
 
 
@@ -106,3 +106,48 @@ def test_scale_valid_types(d1, factor, value):
     assert d3.variable == d1.variable
     assert isclose(d3.value, value)
     assert d3.units == d1.units
+
+
+
+#               from_quantity           #
+"""
+TEST:
+    - type errors
+    - custom units
+"""
+
+@pytest.mark.parametrize(
+    'var, q, units',
+    [
+        (42, Quantity('5 m'), None),
+        (True, Quantity('5 m'), None),
+        ([4, 2], Quantity('5 m'), None),
+
+        ('C_1', '5 m', None),
+        ('C_1', 42 , None),
+        ('C_1', True, None),
+        ('C_1', [4, 2], None),
+        ('C_1', d1, None),
+
+        ('C_1', Quantity('5 m'), 42),
+        ('C_1', Quantity('5 m'), True),
+        ('C_1', Quantity('5 m'), ['k', 'm']),
+        ('C_1', Quantity('5 m'), Datum),
+    ]
+)
+def test_from_quantity_TypeError(var, q, units):
+    with pytest.raises(TypeError):
+        Datum.from_quantity(var, q, units=units)
+
+
+@pytest.mark.parametrize(
+    'var, q, units',
+    [
+        ('C_1', Quantity('5 m'), 'm'),
+        ('C_1', Quantity('5 m'), Unit('m')),
+        ('C_1', Quantity('5 m'), Datum.spec.ureg.parse_units('m')),
+        ('C_1', Datum.spec.ureg('5 m'), 'm'),
+    ]
+)
+def test_from_quantity_no_TypeError(var, q, units):
+    _ = Datum.from_quantity(var, q, units=units)

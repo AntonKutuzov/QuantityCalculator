@@ -417,7 +417,7 @@ class Formula:
         validate_type(round_to, int)
         value = round(1/9, round_to)
         dds = f'{unk} = {value} {units}'
-        must_match('dds', dds)
+        must_match('other', dds, custom_pattern=Datum.spec.pattern)
 
         return dds
 

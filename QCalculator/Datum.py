@@ -26,6 +26,7 @@ class Datum(AbstractDatum):
         validate_type(q, Quantity)
 
         if units is not None:
+            validate_type(units, (str, Unit))
             try:
                 q.ito(units)
             except DimensionalityError:
