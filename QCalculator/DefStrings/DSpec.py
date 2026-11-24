@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Pattern, Callable
+from typing import Pattern, Callable, Optional
 from pint import UnitRegistry
 from QCalculator import DEF_UR
 
@@ -12,3 +12,4 @@ class DSpec:
     sympy_safe: bool = True
     ureg: UnitRegistry = DEF_UR
     value_filters: frozenset[Callable[[int|float], bool]] = frozenset({})
+    ref_units: Optional[str] = None  # only for Datum, not DDS

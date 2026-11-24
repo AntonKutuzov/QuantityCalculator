@@ -18,6 +18,15 @@ class AbstractDatum(ABC):
     def __init__(self, dds: str) -> None:
         self._dds = self.ddef(dds)
 
+        if self.spec.ref_units is not None:
+            ru = self.spec.ureg.parse_units(self.spec.ref_units)
+
+            if not ru.is_compatible_with(self.units):
+                iue = IncompatibleUnits(from_unit=self.units, to_unit=ru)
+                iue.add_note(f'The allowed units for this Datum-like class are "{ru}" or any other '
+                             f'compatible units.')
+                raise iue
+
     def __str__(self):
         return self.dds.string
 
