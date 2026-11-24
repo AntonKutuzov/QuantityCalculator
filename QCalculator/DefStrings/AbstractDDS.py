@@ -31,7 +31,7 @@ class AbstractDDS(str, ABC):
         if self.spec.allowed_symbols:  # if it's not empty
             if self.symbol not in self.spec.allowed_symbols:
                 e = InvalidVarName(self.symbol)
-                e.add_note(f'The symbols allowed by the class are: "{self.spec.allowed_symbols}".')
+                e.add_note(f'The symbols allowed by the class are: "{list(self.spec.allowed_symbols)}".')
                 raise e
 
         for f in self.spec.value_filters:

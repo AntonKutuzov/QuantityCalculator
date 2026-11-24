@@ -3,8 +3,7 @@ from pint import Unit, UnitRegistry
 from math import isclose
 
 from QCalculator.Datum import Datum
-from QCalculator.Exceptions.QDefStringExceptions import InvalidUnitsExpression, UndefinedUnits
-from tests._Older.Exceptions.DatumExceptions import IncompatibleUnits
+from QCalculator.Exceptions.QDefStringExceptions import InvalidUnitsExpression, UndefinedUnits, IncompatibleUnits
 from tests._Older.test_Datum import d1, d2
 
 
