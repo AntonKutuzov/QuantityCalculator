@@ -4,7 +4,7 @@ from QCalculator import Datum, UnitDict
 from QCalculator.DefStrings import DatumDefString
 from QCalculator.util import validate_type, must_match
 
-from typing import List, Optional, Dict, Tuple, Callable
+from typing import List, Optional, Dict, Callable
 from copy import deepcopy
 from sympy import parse_expr, Eq, solve, Symbol, Number, simplify, im
 from pint import Quantity
@@ -33,7 +33,8 @@ class Formula:
             formula: str,
             *,
             def_units: Optional[UnitDict.UNITS_DICT] = None,
-            unit_by_symbol: bool = False
+            unit_by_symbol: bool = False,
+            dds_ref_pattern: DatumDefString = Datum.dds
     ) -> None:
 
         self._eq: Eq
@@ -41,6 +42,7 @@ class Formula:
         self._ubs = unit_by_symbol
         self._data = list()
         self._target = None
+        self._dds_ref = dds_ref_pattern
 
         # Instance defu has priority over class-level defu. If both are None – then it's None
         self._defu: Optional[UnitDict] = None
@@ -190,7 +192,7 @@ class Formula:
                 # there must be no variable erased or written).
                 self._data.append(d.base)
 
-            # If not value is written, but units are NOT compatible, raise exception.
+            # If no value is written, but units are NOT compatible, raise exception.
             else:
                 defu = self._defu.get(v)
                 raise Exception(f'The units for variable "{v}" "{d.units}" are not compatible with default units "{defu}".')
@@ -382,7 +384,6 @@ class Formula:
 
 
 
-
     # ========================================================================================= METHODS DEDUCING UNKNOWN
     def unknown_vars(self) -> List[str]:
         vs = set(self.variables)
@@ -417,7 +418,7 @@ class Formula:
         validate_type(round_to, int)
         value = round(1/9, round_to)
         dds = f'{unk} = {value} {units}'
-        must_match('other', dds, custom_pattern=Datum.spec.pattern)
+        must_match('other', dds, custom_pattern=self._dds_ref.spec.pattern)
 
         return dds
 
@@ -507,7 +508,7 @@ class Formula:
 
             elif self._defu and self.solvable:
                 # if defu is present, there's no target variable, but the equation is already solvable,
-                # we can check consistency
+                # we can check unit consistency
                 if self._defu.is_unit_consistent(self.eq, {key : datum.units}):
                     self._target = datum
                     self._defu[key] = datum.units
