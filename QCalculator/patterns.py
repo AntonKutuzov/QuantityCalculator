@@ -13,7 +13,7 @@ exponent_str = r'(?P<exponent>[-+]?\d+)'
 value_str = fr"(?P<value>{whole_str}(\.{decimal_str})?((E|e){exponent_str})?)"
 
 # defining units
-units_str = r'(?P<units>[^\s](.*[^\s])?)'
+units_str = r'(?P<units>[^\s][a-z]*(.*[^\s])?)'
 
 # general
 # default arbitrary group
