@@ -372,7 +372,7 @@ class Formula:
             q = Quantity(sol, self.target.base.units)
             q.ito(self.target.units if units is None else units)
             q = round(q, self.target.dds.num_decimals if round_to >= 15 else round_to)
-            d = self._d_ref.from_quantity(self.target.variable, q)
+            d = self._d_ref._from_quantity(self.target.variable, q)
 
             res.append(d)
 
