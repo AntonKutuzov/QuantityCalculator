@@ -1,5 +1,4 @@
 from QCalculator import Formula, Datum
-from tests._Older.Exceptions.DatumExceptions import InvalidDatumDefString
 from QCalculator.Exceptions.LinearIteratorExceptions import (
     NoValueError,
     UnusedSymbolError,
@@ -15,7 +14,7 @@ from pint import Unit
 from copy import deepcopy
 
 
-class LinearIterator:
+class Iterator:
     def __init__(self, formulas: List[str], ref_units: Optional[Dict[str|Tuple, str|Unit]] = None) -> None:
         self._formulas = self._normalize_formulas(formulas, ref_units)
         self._ref_units = self._select_units() if ref_units is not None else None

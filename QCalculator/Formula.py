@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from QCalculator import Datum, UnitDict
-from QCalculator.DefStrings import DatumDefString
+from QCalculator import UnitDict, AbstractDatum
+from QCalculator.DefStrings import AbstractDDS
 from QCalculator.util import validate_type, must_match
 
 from typing import List, Optional, Dict, Callable
@@ -34,7 +34,7 @@ class Formula:
             *,
             def_units: Optional[UnitDict.UNITS_DICT] = None,
             unit_by_symbol: bool = False,
-            dds_ref_pattern: DatumDefString = Datum.dds
+            datum_ref = AbstractDatum
     ) -> None:
 
         self._eq: Eq
@@ -42,7 +42,7 @@ class Formula:
         self._ubs = unit_by_symbol
         self._data = list()
         self._target = None
-        self._dds_ref = dds_ref_pattern
+        self._d_ref = datum_ref
 
         # Instance defu has priority over class-level defu. If both are None – then it's None
         self._defu: Optional[UnitDict] = None
@@ -55,9 +55,9 @@ class Formula:
             pass
 
 
-    def __contains__(self, item: str | Datum | DatumDefString):
-        if isinstance(item, Datum | DatumDefString):
-            item = Formula._to_Datum(item)
+    def __contains__(self, item: str | AbstractDatum | AbstractDDS):
+        if isinstance(item, AbstractDatum | AbstractDDS):
+            item = self._to_Datum(item)
 
             for d in self.data:
                 if d == item.base:
@@ -73,7 +73,7 @@ class Formula:
                 return False
 
         else:
-            raise TypeError(f'Expected "str", "Datum" or "DatumDefString", got "{type(item)}".')
+            raise TypeError(f'Expected "str", "AbstractDatum" or "AbstractDDS", got "{type(item)}".')
 
 
     def __str__(self):
@@ -95,16 +95,15 @@ class Formula:
 
 
     # ================================================================================================== PRIVATE METHODS
-    @staticmethod
-    def _to_Datum(dds: DatumDefString | str | Datum) -> Datum:
-        if isinstance(dds, (str, DatumDefString)):
-            return Datum(dds)
+    def _to_Datum(self, dds: AbstractDDS | str | AbstractDatum) -> AbstractDatum:
+        if isinstance(dds, (str, AbstractDDS)):
+            return self._d_ref(dds)
 
-        elif isinstance(dds, Datum):
+        elif isinstance(dds, AbstractDatum):
             return dds
 
         else:
-            raise TypeError(f'Expected "str", "DatumDefString" or "Datum", got "{type(dds)}".')
+            raise TypeError(f'Expected "str", "AbstractDDS" or "AbstractDatum", got "{type(dds)}".')
 
 
     def _make_sympy_eq(self, expr: str, _evaluate: bool = False) -> None:
@@ -129,7 +128,7 @@ class Formula:
     # ================================================================================================= DATA I/O METHODS
     def write(
             self,
-            *data: DatumDefString | str | Datum,
+            *data: AbstractDDS | str | AbstractDatum,
             rewrite: bool = False
     ) -> None:
         """
@@ -153,7 +152,7 @@ class Formula:
 
         for d in data:
             # define variables
-            d = Formula._to_Datum(d)  # type of d validated here
+            d = self._to_Datum(d)  # type of d validated here
             v = d.variable
             u = str(d.base.units)
 
@@ -198,7 +197,7 @@ class Formula:
                 raise Exception(f'The units for variable "{v}" "{d.units}" are not compatible with default units "{defu}".')
 
 
-    def read(self, *variables: str, force_list: bool = False) -> Datum | List[Datum]:
+    def read(self, *variables: str, force_list: bool = False) -> AbstractDatum | List[AbstractDatum]:
         ret_list = list()
 
         for var in variables:
@@ -346,7 +345,7 @@ class Formula:
             auto_determine_unknown: bool = True,
             round_to: int = 15,
             units: Optional[str] = None
-    ) -> List[Datum]:
+    ) -> List[AbstractDatum]:
 
         AUTO_TARGET: bool = False
 
@@ -373,7 +372,7 @@ class Formula:
             q = Quantity(sol, self.target.base.units)
             q.ito(self.target.units if units is None else units)
             q = round(q, self.target.dds.num_decimals if round_to >= 15 else round_to)
-            d = Datum.from_quantity(self.target.variable, q)
+            d = self._d_ref.from_quantity(self.target.variable, q)
 
             res.append(d)
 
@@ -418,7 +417,7 @@ class Formula:
         validate_type(round_to, int)
         value = round(1/9, round_to)
         dds = f'{unk} = {value} {units}'
-        must_match('other', dds, custom_pattern=self._dds_ref.spec.pattern)
+        must_match('other', dds, custom_pattern=self._d_ref.spec.pattern)
 
         return dds
 
@@ -448,7 +447,7 @@ class Formula:
         return vd
 
     @property
-    def data(self) -> List[Datum]:
+    def data(self) -> List[AbstractDatum]:
         return deepcopy(self._data)
 
     @property
@@ -465,12 +464,12 @@ class Formula:
 
 
     @property
-    def target(self) -> Optional[Datum]:
+    def target(self) -> Optional[AbstractDatum]:
         return self._target
 
 
     @target.setter
-    def target(self, dds: DatumDefString | str | Datum | None) -> None:
+    def target(self, dds: AbstractDDS | str | AbstractDatum | None) -> None:
         if dds is None:
             self._target = None
 

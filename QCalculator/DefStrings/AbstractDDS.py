@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod, ABC
-from typing import Match, Optional
+from typing import Match, Optional, Literal
 
 from QCalculator.DefStrings.DSpec import DSpec
 from QCalculator.Exceptions.QDefStringExceptions import (
@@ -66,28 +66,67 @@ class AbstractDDS(str, ABC):
 
     @property
     def variable(self) -> str:
-        return str(self._match.group('variable'))
+        return str(self.match.group('variable'))
 
     @property
     def subscript(self) -> Optional[str]:
-        s = self._match.group('subscript')
+        s = self.match.group('subscript')
 
         if s is None:
-            return None
+            return ''
         else:
             return str(s)
 
     @property
     def symbol(self) -> str:
-        return str(self._match.group('symbol'))
+        return str(self.match.group('symbol'))
 
     @property
     def value(self) -> float:
-        return float(self._match.group('value'))
+        return float(self.match.group('value'))
+
+    @property
+    def whole(self) -> int:
+        return int(self.match.group('whole'))
+
+    @property
+    def decimal(self) -> float:
+        dec = self.match.group('decimal')
+
+        if dec is None:
+            return 0.0
+        else:
+            return float(f'0.{dec}')
+
+    @property
+    def sign(self) -> Literal[1, -1]:
+        v = self.match.group('value')
+        if v[0] == '-':
+            return -1
+        else:
+            return 1
+
+    @property
+    def exponent(self) -> int:
+        e = self.match.group('exponent')
+
+        if e is None:
+            return 0
+        else:
+            return int(e)
+
+    @property
+    def num_decimals(self) -> int:
+        dec = self.decimal
+
+        if dec == 0.0:
+            return 0
+        else:
+            return len(str(dec)) - 2  # minus whole part, which is zero, and the decimal point
 
     @property
     def units(self) -> str:
-        units = self._match.group('units')
+        units = self.match.group('units')
 
         if units is not None:
             units = str(units)
