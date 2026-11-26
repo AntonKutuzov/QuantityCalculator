@@ -17,7 +17,7 @@ class AbstractDDS(str, ABC):
     def __new__(cls, dds, *args, check_units: bool = True, **kwargs) -> object:
         return super().__new__(cls, dds)
 
-    def __init__(self, dds: str, *, check_units: bool = True):
+    def __init__(self, dds: str, *, check_units: bool = True) -> None:
         validate_type(dds, str)
 
         self._match = self.spec.pattern.fullmatch(dds)
@@ -44,11 +44,11 @@ class AbstractDDS(str, ABC):
         super().__init__()
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.string
 
 
-    def __eq__(self, other: AbstractDDS):
+    def __eq__(self, other: AbstractDDS) -> bool:
         from math import isclose
 
         conditions = (

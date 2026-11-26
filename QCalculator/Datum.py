@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pint import Quantity, Unit, DimensionalityError
-from typing import Optional
+from typing import Optional, Self
 
 from QCalculator import AbstractDatum
 from QCalculator.DefStrings import DatumDefString
@@ -13,7 +13,7 @@ class Datum(AbstractDatum):
     ddef = DatumDefString
     spec = ddef.spec
 
-    def _from_quantity(self, var: str, q: Quantity, units: Optional[str | Unit] = None, *args, **kwargs) -> Datum:
+    def _from_quantity(self, var: str, q: Quantity, units: Optional[str | Unit] = None, *args, **kwargs) -> Self:
         return type(self).from_quantity(
             var=var,
             q=q,
@@ -21,7 +21,7 @@ class Datum(AbstractDatum):
         )
 
     @classmethod
-    def from_quantity(cls, var: str, q: Quantity, units: Optional[str | Unit] = None, *args, **kwargs) -> Datum:
+    def from_quantity(cls, var: str, q: Quantity, units: Optional[str | Unit] = None, *args, **kwargs) -> Self:
         validate_type(var, str)
         validate_type(q, Quantity)
 

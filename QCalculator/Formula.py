@@ -344,7 +344,8 @@ class Formula:
             *filters: Callable[[float], bool],
             auto_determine_unknown: bool = True,
             round_to: int = 15,
-            units: Optional[str] = None
+            units: Optional[str] = None,
+            **kwargs
     ) -> List[AbstractDatum]:
 
         AUTO_TARGET: bool = False
@@ -372,9 +373,14 @@ class Formula:
             q = Quantity(sol, self.target.base.units)
             q.ito(self.target.units if units is None else units)
             q = round(q, self.target.dds.num_decimals if round_to >= 15 else round_to)
-            d = self._d_ref._from_quantity(self.target.variable, q)
 
-            res.append(d)
+            try:
+                d = self._d_ref.from_quantity(self.target.variable, q, **kwargs)
+                res.append(d)
+            except TypeError as te:
+                if 'required positional argument' in te.args[0]:
+                    te.add_note('Specify the required positional argument(s) in the Formula.solve() function.')
+                    raise te
 
         if AUTO_TARGET:
             self.target = None

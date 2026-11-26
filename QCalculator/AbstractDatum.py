@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pint import Quantity, Unit, UndefinedUnitError, DimensionalityError
+from typing import Self
 from math import isinf, isnan
 
-from QCalculator.DefStrings import AbstractDDS, DatumDefString, DSpec
+from QCalculator.DefStrings import AbstractDDS, DSpec
 from QCalculator.util import validate_type, check_unit_validity
 from QCalculator.Exceptions.QDefStringExceptions import UndefinedUnits, IncompatibleUnits
 
@@ -27,10 +28,10 @@ class AbstractDatum(ABC):
                              f'compatible units.')
                 raise iue
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.dds.string
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, AbstractDatum):
             raise TypeError(f'Expected "Datum", got: "{type(other)}".')
 
@@ -45,7 +46,7 @@ class AbstractDatum(ABC):
         return all(conditions)
 
     @abstractmethod
-    def _from_quantity(self, var: str, q: Quantity, *args, **kwargs):
+    def _from_quantity(self, var: str, q: Quantity, *args, **kwargs) -> Self:
         """
         Calls the public "from_quantity" method if the respective class by using type(self).
         """
@@ -53,7 +54,7 @@ class AbstractDatum(ABC):
 
     @classmethod
     @abstractmethod
-    def from_quantity(cls, var: str, q: Quantity, *args, **kwargs):
+    def from_quantity(cls, var: str, q: Quantity, *args, **kwargs) -> Self:
         ...
 
     # ================================================================================================== PRIVATE HELPERS
@@ -69,7 +70,7 @@ class AbstractDatum(ABC):
             raise UndefinedUnits(cls, u)
 
     # =================================================================================================== PUBLIC METHODS
-    def to(self, units: str | Unit) -> AbstractDatum:
+    def to(self, units: str | Unit) -> Self:
         validate_type(units, (str, Unit))
         check_unit_validity(self.__class__, units)
 
@@ -81,7 +82,7 @@ class AbstractDatum(ABC):
 
         return self._from_quantity(self.variable, new_q)
 
-    def scale(self, factor: float | int) -> AbstractDatum:
+    def scale(self, factor: float | int) -> Self:
         validate_type(factor, (float, int))
 
         if isnan(factor) or isinf(factor):
@@ -120,7 +121,7 @@ class AbstractDatum(ABC):
         return self.spec.ureg.parse_units(self.dds.units)
 
     @property
-    def base(self) -> AbstractDatum:
+    def base(self) -> Self:
         q = self.quantity.to_base_units()
         d = self._from_quantity(self.variable, q)
         return d
